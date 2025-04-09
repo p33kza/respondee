@@ -7,25 +7,27 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 
 const categories = [
-  { type: 'Crime', icon: 'handcuffs' },
-  { type: 'Price', icon: 'pricetag' },
-  { type: 'Women Abuse', icon: 'female' },
-  { type: 'Accident', icon: 'car-crash' },
-  { type: 'Fire', icon: 'flame' },
-  { type: 'Child Abuse', icon: 'happy' },
-  { type: 'Red Tape', icon: 'document-text' },
-  { type: 'Scam', icon: 'warning' },
+  { type: 'Sum of Money', icon: 'cash' },
+  { type: 'Theft', icon: 'lock-closed' },
+  { type: 'Harassment', icon: 'warning' },
+  { type: 'Defamation', icon: 'chatbubble-ellipses' },
+  { type: 'Fraud', icon: 'alert-circle' },
+  { type: 'Others', icon: 'ellipsis-horizontal' },
 ];
+
+// const [isEmergency, setIsEmergency] = useState(false);
 
 export default function ComplaintScreen() {
   const [selectedType, setSelectedType] = useState('');
   const [message, setMessage] = useState('');
   const [agreed, setAgreed] = useState(false);
+  const [isEmergency, setIsEmergency] = useState(false);
 
   const toggleType = (type) => setSelectedType(type);
 
@@ -80,6 +82,12 @@ export default function ComplaintScreen() {
         <Text style={styles.uploadText}>Upload File/s</Text>
         <Text style={styles.uploadSubText}>Photo, Video, .jpg / .png / .mp4 Max of 5 files.</Text>
       </TouchableOpacity>
+
+      {/* 5. Emergency Toggle */}
+      <View style={styles.switchRow}>
+        <Text style={styles.switchLabel}>Mark as Emergency</Text>
+        <Switch value={isEmergency} onValueChange={setIsEmergency} />
+      </View>
 
       {/* Terms Agreement */}
       <TouchableOpacity
@@ -209,6 +217,16 @@ const styles = StyleSheet.create({
     color: '#FE712D',
     fontWeight: 'bold',
     textDecorationLine: 'underline',
+  },
+  switchRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  switchLabel: {
+    color: '#3E4A5A',
+    fontWeight: 'bold',
   },
   submitBtn: {
     backgroundColor: '#FE712D',

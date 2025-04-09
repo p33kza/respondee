@@ -18,14 +18,8 @@ export default function RequestScreen() {
   const [isEmergency, setIsEmergency] = useState(false);
 
   const requestOptions = [
-    { icon: 'broom', label: 'Garbage Pickup' },
-    { icon: 'lightbulb-outline', label: 'Streetlight Repair' },
-    { icon: 'water-outline', label: 'Water Service Issue' },
-    { icon: 'road-variant', label: 'Road Maintenance' },
-    { icon: 'wheelchair-accessibility', label: 'Accessibility Concern' },
-    { icon: 'tree-outline', label: 'Tree Trimming' },
-    { icon: 'bus-outline', label: 'Public Transport' },
-    { icon: 'alert-circle-outline', label: 'Emergency Assistance' },
+    { icon: 'grave-stone', label: 'Wake' },
+    { icon: 'table-chair', label: 'Furnitures' },
   ];
 
   const handleSubmit = () => {
@@ -148,7 +142,7 @@ const styles = StyleSheet.create({
       flexDirection: 'row',
       flexWrap: 'wrap',
       justifyContent: 'space-between',
-      marginBottom: -190,
+      marginBottom: -50,
     },
     gridItem: {
       width: '40%',

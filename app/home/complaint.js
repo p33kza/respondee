@@ -21,8 +21,6 @@ const categories = [
   { type: 'Others', icon: 'ellipsis-horizontal' },
 ];
 
-// const [isEmergency, setIsEmergency] = useState(false);
-
 export default function ComplaintScreen() {
   const [selectedType, setSelectedType] = useState('');
   const [message, setMessage] = useState('');
@@ -63,10 +61,10 @@ export default function ComplaintScreen() {
       </View>
 
       {/* Feedback Input */}
-      <Text style={styles.subtitle}>Feedback message</Text>
+      <Text style={styles.subtitle}>Additional Details</Text>
       <TextInput
         style={styles.textArea}
-        placeholder="Type feedback here"
+        placeholder="Type further details here"
         multiline
         numberOfLines={6}
         maxLength={500}

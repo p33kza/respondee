@@ -10,7 +10,7 @@ import {
   Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-
+import { fileComplaint } from '../../services/caseService'
 
 const categories = [
   { type: 'Sum of Money', icon: 'cash' },
@@ -25,19 +25,47 @@ const categories = [
 
 export default function ComplaintScreen() {
   const [selectedType, setSelectedType] = useState('');
-  const [message, setMessage] = useState('');
+  const [userId, setUserId] = useState('')
+  const [name, setName] = useState('')
+  const [address, setAddress] = useState('')
   const [agreed, setAgreed] = useState(false);
-  const [isEmergency, setIsEmergency] = useState(false);
+  const [contact, setContact] = useState('')
+  const [respondent, setRespondent] = useState('')
+  const [respondentAddress, setRespondentAddress] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState('')
+  const [message, setMessage] = useState('')
+  const [isEmergency, setIsEmergency] = useState(false)
 
   const toggleType = (type) => setSelectedType(type);
 
-  const handleSubmit = () => {
-    if (!selectedType || !message || !agreed) {
-      Alert.alert('Incomplete', 'Please fill out all fields and accept the terms.');
-      return;
+  const handleSubmit = async () => {
+    try {
+      await fileComplaint({
+        user_id: userId,
+        complainant: name,
+        address,
+        contact_number: contact,
+        respondent,
+        respondent_address: respondentAddress,
+        complaint_type: selectedCategory,
+        complaint_description: message,
+        emergency: isEmergency
+      })
+
+      Alert.alert('Complaint Submitted!')
+      setUserId('')
+      setName('')
+      setAddress('')
+      setContact('')
+      setRespondent('')
+      setRespondentAddress('')
+      setSelectedCategory('')
+      setMessage('')
+      setIsEmergency(false)
+    } catch (error) {
+      Alert.alert('Submission Failed', error.message)
     }
-    Alert.alert('Report, Submitted');
-  };
+  }
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -63,10 +91,10 @@ export default function ComplaintScreen() {
       </View>
 
       {/* Feedback Input */}
-      <Text style={styles.subtitle}>Feedback message</Text>
+      <Text style={styles.subtitle}>Additional Details</Text>
       <TextInput
         style={styles.textArea}
-        placeholder="Type feedback here"
+        placeholder="Type further details here"
         multiline
         numberOfLines={6}
         maxLength={500}

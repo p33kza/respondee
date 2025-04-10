@@ -10,6 +10,7 @@ import {
   Switch,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { fileRequest } from '../services/caseService'
 
 export default function RequestScreen() {
   const [selectedType, setSelectedType] = useState('');
@@ -22,13 +23,21 @@ export default function RequestScreen() {
     { icon: 'table-chair', label: 'Furnitures' },
   ];
 
-  const handleSubmit = () => {
-    if (!selectedType || !description || !agreed) {
-      Alert.alert('Incomplete', 'Please fill out all fields and accept the terms.');
-      return;
+  const handleSubmit = async () => {
+    try {
+      await fileRequest({
+        request_type: selectedType,
+        request_desc: description,
+        emergency: isEmergency
+      })
+      Alert.alert('Request Submitted!')
+      setSelectedType('')
+      setDescription('')
+      setIsEmergency(false)
+    } catch (error) {
+      Alert.alert('Submission Failed', error.message)
     }
-    Alert.alert('✅ Submitted', 'Your request has been sent!');
-  };
+  }
 
   return (
     <ScrollView style={styles.container}>

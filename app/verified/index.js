@@ -18,11 +18,9 @@ export default function HomeScreen() {
   const [showFloatingIcon, setShowFloatingIcon] = useState(false);
   const actions = [
     { label: 'File Complaint', icon: 'document-text-outline', route: '/verified/complaint' },
-    { label: 'Request Service', icon: 'construct-outline', route: '/verified/request' },
+    { label: 'Request Service', icon: 'construct-outline', route: '/request' },
     { label: 'Track Status', icon: 'time-outline', route: '/track' },
     { label: 'View Responses', icon: 'chatbox-ellipses-outline', route: '/verified/responses' },
-    { label: 'Map Issues', icon: 'map-outline', route: '/verified/map' },
-    { label: 'Analytics / Stats', icon: 'stats-chart-outline', route: '/verified/analytics' },
     { label: 'FAQs / Help', icon: 'help-circle-outline', route: '/verified/faq' },
     { label: 'Feedback', icon: 'megaphone-outline', route: '/verified/feedback' },
   ];
@@ -60,41 +58,41 @@ export default function HomeScreen() {
 
         {/* Grid of Circular Icons */}
         <View style={styles.iconGrid}>
-  {actions.map((item, i) => (
-    <TouchableOpacity
-      key={i}
-      style={styles.iconAction}
-      onPress={() => router.push(item.route)}
-    >
-      <View style={styles.iconCircle}>
-        <Ionicons name={item.icon} size={24} color="#FE712D" />
+          {actions.map((item, i) => (
+            <TouchableOpacity
+              key={i}
+              style={styles.iconAction}
+              onPress={() => router.push(item.route)}
+            >
+              <View style={styles.iconCircle}>
+                <Ionicons name={item.icon} size={24} color="#FE712D" />
+              </View>
+              <Text style={styles.iconLabel}>{item.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+      <View style={styles.summaryCard}>
+        <View style={styles.summaryHeader}>
+          <Text style={styles.summaryTitle}>Streetlight Not Working</Text>
+          <Text style={styles.summaryDate}>Submitted: March 28, 2025</Text>
+        </View>
+        <Text style={styles.statusPending}>🔄 Pending</Text>
+        <TouchableOpacity style={styles.viewAllBtn}>
+          <Text style={styles.viewAllText}>📄 View All</Text>
+        </TouchableOpacity>
       </View>
-      <Text style={styles.iconLabel}>{item.label}</Text>
-    </TouchableOpacity>
-  ))}
-</View>
 
-<View style={styles.summaryCard}>
-  <View style={styles.summaryHeader}>
-    <Text style={styles.summaryTitle}>Streetlight Not Working</Text>
-    <Text style={styles.summaryDate}>Submitted: March 28, 2025</Text>
-  </View>
-  <Text style={styles.statusPending}>🔄 Pending</Text>
-  <TouchableOpacity style={styles.viewAllBtn}>
-    <Text style={styles.viewAllText}>📄 View All</Text>
-  </TouchableOpacity>
-</View>
-
-<View style={styles.cardRow}>
-  <View style={styles.smallStatCard}>
-    <Text style={styles.statLabel}>Open Requests</Text>
-    <Text style={styles.statValue}>🔄 3 Pending</Text>
-  </View>
-  <View style={styles.smallStatCard}>
-    <Text style={styles.statLabel}>Resolved Requests</Text>
-    <Text style={styles.statValue}>✅ 12 Completed</Text>
-  </View>
-</View>
+      <View style={styles.cardRow}>
+        <View style={styles.smallStatCard}>
+          <Text style={styles.statLabel}>Open Requests</Text>
+          <Text style={styles.statValue}>🔄 3 Pending</Text>
+        </View>
+        <View style={styles.smallStatCard}>
+          <Text style={styles.statLabel}>Resolved Requests</Text>
+          <Text style={styles.statValue}>✅ 12 Completed</Text>
+        </View>
+      </View>
 
       {/* Activity */}
       <View style={styles.section}>
@@ -117,7 +115,7 @@ const styles = StyleSheet.create({
   },
   iconAction: {
     alignItems: 'center',
-    width: '14%', // fit 4 per row with spacing
+    width: '26%', // fit 4 per row with spacing
     marginBottom: 20,
   },
     

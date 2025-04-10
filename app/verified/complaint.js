@@ -24,7 +24,6 @@ const categories = [
 // const [isEmergency, setIsEmergency] = useState(false);
 
 export default function ComplaintScreen() {
-  const [selectedType, setSelectedType] = useState('');
   const [userId, setUserId] = useState('')
   const [name, setName] = useState('')
   const [address, setAddress] = useState('')
@@ -48,7 +47,7 @@ export default function ComplaintScreen() {
         respondent,
         respondent_address: respondentAddress,
         complaint_type: selectedCategory,
-        complaint_description: message,
+        complaint_desc: message,
         emergency: isEmergency
       })
 
@@ -80,9 +79,9 @@ export default function ComplaintScreen() {
             key={type}
             style={[
               styles.categoryBox,
-              selectedType === type && styles.activeCategory,
+              selectedCategory === type && styles.activeCategory,
             ]}
-            onPress={() => toggleType(type)}
+            onPress={() => setSelectedCategory(type)}
           >
             <Ionicons name={icon} size={24} color="#444" />
             <Text style={styles.categoryText}>{type}</Text>

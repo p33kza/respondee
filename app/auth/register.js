@@ -1,9 +1,16 @@
-
+import { useState } from 'react'
 import { View, Text, TextInput, StyleSheet, Pressable, TouchableOpacity, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 
 export default function RegisterScreen() {
     const router = useRouter();
+    const [firstName, setFirstName] = useState('');
+    const [middleName, setMiddleName] = useState('');
+    const [lastName, setLastName] = useState('');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [phoneNumber, setPhoneNumber] = useState('');
+    const [message, setMessage] = useState('');
   return (
     
     <View style={styles.container}>
@@ -24,25 +31,40 @@ export default function RegisterScreen() {
 
       {/* Input Fields */}
       <View style={styles.row}>
-        <TextInput placeholder="First Name" style={[styles.input, { flex: 1 }]} />
-        <TextInput placeholder="Suffix" style={[styles.input, { width: 80, marginLeft: 8 }]} />
-      </View>
-      <TextInput placeholder="Middle Name (optional)" style={styles.input} />
-      <TextInput placeholder="Last Name" style={styles.input} />
-
-      {/* Phone Number Field */}
-      <View style={styles.phoneInput}>
-        <Image
-          source={{ uri: 'https://flagcdn.com/w40/ph.png' }}
-          style={{ width: 24, height: 16, marginRight: 8 }}
-        />
-        <Text style={{ marginRight: 8 }}>+63</Text>
         <TextInput
-          placeholder="Phone Number"
-          keyboardType="number-pad"
-          style={{ flex: 1 }}
+          placeholder="First Name"
+          style={[styles.input, { flex: 1 }]}
+          value={firstName}
+          onChangeText={setFirstName}
+        />
+        <TextInput
+          placeholder="Suffix"
+          style={[styles.input, { width: 80, marginLeft: 8 }]}
+          // Optional: you can use a `suffix` state too if you want to capture it
         />
       </View>
+      <TextInput
+        placeholder="Middle Name (optional)"
+        style={styles.input}
+        value={middleName}
+        onChangeText={setMiddleName}
+      />
+      <TextInput
+        placeholder="Last Name"
+        style={styles.input}
+        value={lastName}
+        onChangeText={setLastName}
+      />
+
+      {/* Email Address Field */}
+      <TextInput
+        placeholder="Email Address"
+        keyboardType="email-address"
+        autoCapitalize="none"
+        style={styles.input}
+        value={email}
+        onChangeText={setEmail}
+      />
 
       {/* Terms Text */}
       <Text style={styles.terms}>

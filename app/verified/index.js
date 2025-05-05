@@ -19,7 +19,7 @@ export default function HomeScreen() {
   const actions = [
     { label: 'File Complaint', icon: 'document-text-outline', route: '/verified/complaint' },
     { label: 'Request Service', icon: 'construct-outline', route: '/request' },
-    { label: 'Track Status', icon: 'time-outline', route: '/track' },
+    { label: 'Track Status', icon: 'time-outline', route: '/trackstatus' },
     { label: 'View Responses', icon: 'chatbox-ellipses-outline', route: '/verified/responses' },
     { label: 'FAQs / Help', icon: 'help-circle-outline', route: '/verified/faq' },
     { label: 'Feedback', icon: 'megaphone-outline', route: '/verified/feedback' },

@@ -8,6 +8,8 @@ import {
   Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+// import 'react-native-reanimated';
+
 
 export default function WelcomeScreen() {
   const router = useRouter();

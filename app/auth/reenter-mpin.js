@@ -11,6 +11,7 @@ import {
   Keyboard,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import logo from '../../assets/images/Logo1.png';
 
 const { width, height } = Dimensions.get('window');
 

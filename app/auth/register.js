@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { View, Text, TextInput, StyleSheet, Pressable, TouchableOpacity, Image } from 'react-native';
 import { useRouter } from 'expo-router';
+import logo from '../../assets/images/Logo1.png'; // Adjust the path as necessary
 
 export default function RegisterScreen() {
     const router = useRouter();
@@ -24,9 +25,8 @@ export default function RegisterScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Let’s Get Started!</Text>
-        <View style={styles.logoCircle}>
-          <Text style={styles.logoText}>LOGO</Text>
-        </View>
+        <Image source={logo} style={styles.logoCircle} />
+
       </View>
 
       {/* Input Fields */}
@@ -134,9 +134,9 @@ const styles = StyleSheet.create({
     logoCircle: {
       width: 60,
       height: 60,
-      borderRadius: 30,
-      borderWidth: 1,
-      borderColor: '#999',
+      // borderRadius: 30,
+      // borderWidth: 1,
+      // borderColor: '#999',
       justifyContent: 'center',
       alignItems: 'center',
     },

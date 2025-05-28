@@ -7,8 +7,10 @@ import {
   StyleSheet,
   SafeAreaView,
   Keyboard,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import logo from '../../assets/images/Logo1.png';
 
 export default function MPINLoginScreen() {
   const router = useRouter();
@@ -49,9 +51,8 @@ export default function MPINLoginScreen() {
     <SafeAreaView style={styles.container}>
       {/* Logo */}
       <View style={styles.logoWrapper}>
-        <View style={styles.logoCircle}>
-          <Text style={styles.logoText}>LOGO</Text>
-        </View>
+      <Image source={logo} style={styles.logoCircle} />
+
       </View>
 
       {/* Progress */}
@@ -117,7 +118,7 @@ const styles = StyleSheet.create({
     width: 70,
     height: 70,
     borderRadius: 35,
-    backgroundColor: '#D0D7DF',
+    // backgroundColor: '#D0D7DF',
     justifyContent: 'center',
     alignItems: 'center',
   },

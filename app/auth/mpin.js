@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Dimensions, SafeAreaView, Keyboard,} from 'react-native';
 import { useRouter } from 'expo-router';
 
+
 const { width, height } = Dimensions.get('window');
 
 export default function MPINScreen() {

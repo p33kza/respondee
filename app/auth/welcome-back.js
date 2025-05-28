@@ -10,6 +10,7 @@ import {
   Keyboard,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import logo from '../../assets/images/Logo1.png';
 
 export default function WelcomeBackScreen() {
   const router = useRouter();
@@ -56,11 +57,10 @@ export default function WelcomeBackScreen() {
     <SafeAreaView style={styles.container}>
       {/* Top */}
       <View style={styles.top}>
-        <View style={styles.logoCircle}>
-          <Text style={styles.logoText}>LOGO</Text>
-        </View>
+      <Image source={logo} style={styles.logoCircle} />
 
-        <Text style={styles.heading}>Welcome Back, name!</Text>
+
+        <Text style={styles.heading}>Welcome Back, Juan!</Text>
         <Text style={styles.subtext}>Enter your 4-digit pass code</Text>
 
         <View style={styles.row}>
@@ -88,7 +88,7 @@ export default function WelcomeBackScreen() {
 
       {/* Bottom */}
       <View style={styles.bottom}>
-        <Text style={styles.phoneText}>+63922***5100</Text>
+        <Text style={styles.phoneText}>+639222555100</Text>
         <Text style={styles.switchText}>
           Not you? <Text style={styles.switchLink}>Switch Account</Text>
         </Text>
@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#D0D7DF',
+    // backgroundColor: '#D0D7DF',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 24,

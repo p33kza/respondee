@@ -10,6 +10,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import logo from '../../assets/images/Logo1.png';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -18,9 +19,8 @@ export default function LoginScreen() {
     <SafeAreaView style={styles.container}>
       {/* Top Section */}
       <View style={styles.topSection}>
-        <View style={styles.logoCircle}>
-          <Text style={styles.logoText}>LOGO</Text>
-        </View>
+      <Image source={logo} style={styles.logoCircle} />
+
 
         <Text style={styles.heading}>Welcome!</Text>
         <Text style={styles.subtext}>Please, enter your registered number</Text>
@@ -75,7 +75,7 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#D0D7DF',
+    // backgroundColor: '#D0D7DF',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 24,

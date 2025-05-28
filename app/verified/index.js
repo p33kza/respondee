@@ -11,6 +11,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Image } from 'react-native';
 import { ScrollView } from 'react-native';
+import RecentActivityCarousel from './RecentActivityCarousel';
+import RecentActivityList from './RecentActivityList';
+import { supabase } from '../../lib/supabase'; // adjust path as needed
+
+
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -25,14 +30,62 @@ export default function HomeScreen() {
     { label: 'Feedback', icon: 'megaphone-outline', route: '/verified/feedback' },
   ];
 
+  const [showFullList, setShowFullList] = React.useState(false);
+  const [openCases, setOpenCases] = useState(0);
+  const [resolvedCases, setResolvedCases] = useState(0);  
+
+  async function fetchCaseCounts() {
+    const { data: complaints, error: cError } = await supabase.from('complaints').select('*');
+    const { data: requests, error: rError } = await supabase.from('requests').select('*');
+  
+    // if (cError || rError) {
+    //   console.error('Error fetching statuses:', cError || rError);
+    //   return;
+    // }
+  
+    // console.log('Complaints data:', complaints);
+    // console.log('Requests data:', requests);
+  
+    const combined = [...(complaints || []), ...(requests || [])];
+  
+    const normalize = s => s?.trim().toLowerCase();
+  
+    const openStatuses = ['pending', 'to verify', 'in progress'];
+    const resolvedStatuses = ['settled', 'unsettled'];
+  
+    // Check what keys are actually in the objects
+    // combined.forEach((item, idx) => {
+    //   console.log(`Item ${idx} keys:`, Object.keys(item));
+    //   console.log(`Item ${idx} status:`, item.status);
+    // });
+  
+    const open = combined.filter(item => openStatuses.includes(normalize(item.status))).length;
+    const resolved = combined.filter(item => resolvedStatuses.includes(normalize(item.status))).length;
+  
+    // console.log('Open Cases:', open);
+    // console.log('Resolved Cases:', resolved);
+  
+    setOpenCases(open);
+    setResolvedCases(resolved);
+  }
+
+  useEffect(() => {
+    fetchCaseCounts();
+  }, []);  
+
+  function handleViewAll() {
+    setShowFullList(true);
+  }
+
   return (
     <SafeAreaView style={styles.container}>
        <ScrollView contentContainerStyle={styles.scrollContent}
          showsVerticalScrollIndicator={false}>
       {/* Logo */}
       <View style={styles.logoContainer}>
-      <Image source={require('../../assets/images/Logo.png')} style={styles.promoImage} />
-</View>
+        <Image source={require('../../assets/images/Logo1.png')} style={styles.secondLogo} />
+        <Image source={require('../../assets/images/Logo.png')} style={styles.promoImage} />
+      </View>
 
       {/* Profile */}
       <View style={styles.profileRow}>
@@ -52,7 +105,7 @@ export default function HomeScreen() {
       <View style={styles.announcement}>
         <Text style={styles.announcementTitle}>🚀 New Feature</Text>
         <Text style={styles.announcementText}>
-          You can now upload images when filing a complaint!
+          You can now upload images when filing a case!
         </Text>
       </View>
 
@@ -72,32 +125,24 @@ export default function HomeScreen() {
           ))}
         </View>
 
-      <View style={styles.summaryCard}>
-        <View style={styles.summaryHeader}>
-          <Text style={styles.summaryTitle}>Streetlight Not Working</Text>
-          <Text style={styles.summaryDate}>Submitted: March 28, 2025</Text>
+        <View style={styles.cardRow}>
+          <View style={styles.smallStatCard}>
+            <Text style={styles.cardTitle}>Open Cases</Text>
+            <Text style={styles.cardCount}>📄 {openCases} Pending</Text>
+          </View>
+          <View style={styles.smallStatCard}>
+            <Text style={styles.cardTitle}>Resolved Cases</Text>
+            <Text style={styles.cardCount}>✅ {resolvedCases} Completed</Text>
+          </View>
         </View>
-        <Text style={styles.statusPending}>🔄 Pending</Text>
-        <TouchableOpacity style={styles.viewAllBtn}>
-          <Text style={styles.viewAllText}>📄 View All</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.cardRow}>
-        <View style={styles.smallStatCard}>
-          <Text style={styles.statLabel}>Open Requests</Text>
-          <Text style={styles.statValue}>🔄 3 Pending</Text>
-        </View>
-        <View style={styles.smallStatCard}>
-          <Text style={styles.statLabel}>Resolved Requests</Text>
-          <Text style={styles.statValue}>✅ 12 Completed</Text>
-        </View>
-      </View>
 
       {/* Activity */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Recent Activity</Text>
-        <Text style={styles.sectionSubtitle}>No recent activity yet</Text>
+        <Text style={[styles.sectionTitle, styles.recentActivityHeader]}>Recent Activity</Text>
+          <RecentActivityCarousel onViewAll={handleViewAll} />
+            {showFullList && (
+              <RecentActivityList onClose={() => setShowFullList(false)} />
+            )}
       </View>
 
       <View style={{ flex: 1 }} />
@@ -183,7 +228,7 @@ const styles = StyleSheet.create({
   },
   
   section: {
-    marginBottom: 24,
+    marginBottom: -100,
     marginTop: 20,
   },
   sectionTitle: {
@@ -220,17 +265,26 @@ const styles = StyleSheet.create({
     width: 160,
     height: 40,
     marginBottom: 24,
+    flexDirection: 'row',
   },
   
   logoImage: {
     width: '100%',
     height: '100%',
   },
+
+  secondLogo: {
+    width: 45,            // adjust size as needed
+    height: 45,
+    marginLeft: 8,        // spacing between the two logos
+    resizeMode: 'contain',
+  },
+
   iconGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    gap: 30,               // Optional spacing between items
+    gap: 10,               // Optional spacing between items
     marginBottom: 20,
   },
   
@@ -255,8 +309,15 @@ const styles = StyleSheet.create({
   cardRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginBottom: 1,  // reduce or remove if needed
   },
-  
+
+  recentActivityHeader: {
+    marginTop: 1,     // reduced from 20 or more
+    fontWeight: 'bold',
+    fontSize: 18,
+  },
+
   smallCard: {
     flex: 0.48,
     height: 100,
@@ -264,39 +325,39 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   
-  summaryCard: {
-    backgroundColor: '#E9EDF2',
-    borderRadius: 10,
-    padding: 16,
-    marginBottom: 20,
-  },
+  // summaryCard: {
+  //   backgroundColor: '#E9EDF2',
+  //   borderRadius: 10,
+  //   padding: 16,
+  //   marginBottom: 4,
+  // },
   
-  summaryHeader: {
-    marginBottom: 8,
-  },
+  // summaryHeader: {
+  //   marginBottom: 4,
+  // },
   
-  summaryTitle: {
-    fontWeight: 'bold',
-    fontSize: 16,
-    color: '#3E4A5A',
-  },
+  // summaryTitle: {
+  //   fontWeight: 'bold',
+  //   fontSize: 16,
+  //   color: '#3E4A5A',
+  // },
   
-  summaryDate: {
-    fontSize: 12,
-    color: '#777',
-  },
+  // summaryDate: {
+  //   fontSize: 12,
+  //   color: '#777',
+  // },
   
-  statusPending: {
-    backgroundColor: '#FFE5B4',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-    fontSize: 12,
-    color: '#A66C00',
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
+  // statusPending: {
+  //   backgroundColor: '#FFE5B4',
+  //   alignSelf: 'flex-start',
+  //   paddingHorizontal: 10,
+  //   paddingVertical: 4,
+  //   borderRadius: 20,
+  //   fontSize: 12,
+  //   color: '#A66C00',
+  //   fontWeight: 'bold',
+  //   marginBottom: 10,
+  // },
   
   viewAllBtn: {
     alignSelf: 'flex-end',
@@ -306,11 +367,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#FE712D',
   },
-  
+
   cardRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 24,
+  },
+
+  cardTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    // color: '#3E4A5A',
+    marginBottom: 4,
   },
   
   smallStatCard: {
@@ -319,6 +387,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 16,
     alignItems: 'center',
+    marginBottom: -30,
+    marginTop: -20,
   },
   
   statLabel: {

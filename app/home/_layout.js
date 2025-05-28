@@ -30,10 +30,10 @@ function MainTabs() {
         tabBarLabel: 'Home',
         tabBarIcon: ({ color }) => <Ionicons name="home-outline" size={22} color={color} />
       }} />
-      <Tab.Screen name="notification" component={NotificationScreen} options={{
+      {/* <Tab.Screen name="notification" component={NotificationScreen} options={{
         tabBarLabel: 'Notification',
         tabBarIcon: ({ color }) => <Ionicons name="notifications-outline" size={22} color={color} />
-      }} />
+      }} /> */}
       <Tab.Screen name="complaint" component={ComplaintScreen} options={{
         tabBarLabel: '',
         tabBarIcon: ({ color }) => (
@@ -42,10 +42,10 @@ function MainTabs() {
           </View>
         )
       }} />
-      <Tab.Screen name="history" component={HistoryScreen} options={{
+      {/* <Tab.Screen name="history" component={HistoryScreen} options={{
         tabBarLabel: 'History',
         tabBarIcon: ({ color }) => <Ionicons name="time-outline" size={22} color={color} />
-      }} />
+      }} /> */}
       <Tab.Screen name="account" component={AccountScreen} options={{
         tabBarLabel: 'Account',
         tabBarIcon: ({ color }) => <Ionicons name="person-outline" size={22} color={color} />

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
+import logo from '../../assets/images/Logo1.png';
 
 export default function OTPScreen() {
   const router = useRouter();

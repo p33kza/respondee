@@ -32,10 +32,10 @@ const TrackStatus = () => {
     return (
       <View style={styles.card}>
         <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">
-          {item.complaint_name || item.case_title || "No Title"}
+          {item.complaint_name || item.request_title || "No Title"}
         </Text>
         <Text style={styles.desc} numberOfLines={2} ellipsizeMode="tail">
-          {item.complaint_desc || item.description || "No description"}
+          {item.complaint_desc || item.request_desc || "No description"}
         </Text>
         <View style={styles.statusContainer}>
           <View

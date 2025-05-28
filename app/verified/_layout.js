@@ -31,7 +31,7 @@ export default function Layout() {
           ),
         }}
       />
-      <Tab.Screen
+      {/* <Tab.Screen
         name="notification"
         component={NotificationScreen}
         options={{
@@ -40,7 +40,7 @@ export default function Layout() {
             <Ionicons name="notifications-outline" size={22} color={color} />
           ),
         }}
-      />
+      /> */}
       <Tab.Screen
         name="complaint"
         component={ComplaintScreen}
@@ -58,7 +58,7 @@ export default function Layout() {
           tabBarLabel: '',
         }}
       />
-      <Tab.Screen
+      {/* <Tab.Screen
         name="history"
         component={HistoryScreen}
         options={{
@@ -67,7 +67,7 @@ export default function Layout() {
             <Ionicons name="time-outline" size={22} color={color} />
           ),
         }}
-      />
+      /> */}
       <Tab.Screen
         name="account"
         component={AccountScreen}

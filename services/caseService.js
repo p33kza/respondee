@@ -19,24 +19,59 @@ export async function fileComplaint({ complaint_type, complaint_desc, emergency 
   return data
 }
 
+function parseQuantitiesFromDescription(desc) {
+  const chairRegex = /(\d+)\s*(chairs?|upuan|monoblocks?)/gi;
+  const tableRegex = /(\d+)\s*(tables?|lamesa|mesa)/gi;
+  const tentRegex = /(\d+)\s*(tents?|tent)/gi;
+
+  let chairs = 0, tables = 0, tents = 0;
+  let match;
+
+  while ((match = chairRegex.exec(desc)) !== null) {
+    chairs += parseInt(match[1]);
+  }
+  while ((match = tableRegex.exec(desc)) !== null) {
+    tables += parseInt(match[1]);
+  }
+  while ((match = tentRegex.exec(desc)) !== null) {
+    tents += parseInt(match[1]);
+  }
+
+  return { chairs, tables, tents };
+}
+
 export async function fileRequest({ request_type, request_desc, emergency }) {
   try {
-    // 🧠 Step 1: Generate title from FastAPI
-    const response = await fetch('http://10.0.2.2:8001/generate-title', {
+    // Parse quantities from description text
+    const { chairs, tables, tents } = parseQuantitiesFromDescription(request_desc);
+
+    // Generate title via backend FastAPI service (thru dev build)
+    const response = await fetch('http://10.0.2.2:8004/generate-title', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ description: request_desc }),
     });
-
     const data = await response.json();
     const request_title = data.title || 'Untitled Request';
 
-    // 📥 Step 2: Insert into Supabase
+    // Generate title via backend FastAPI service (thru physical mobile device)
+    // const response = await fetch('http://192.168.1.197:8001/generate-title', {
+    //   method: 'POST',
+    //   headers: { 'Content-Type': 'application/json' },
+    //   body: JSON.stringify({ description: request_desc }),
+    // });
+    // const data = await response.json();
+    // const request_title = data.title || 'Untitled Request';
+
+    // Insert into Supabase with quantities and title
     const { error } = await supabase.from('requests').insert({
       request_title,
       request_desc,
       request_type,
       emergency,
+      quan_chairs: chairs,
+      quan_tables: tables,
+      quan_tents: tents,
       status: 'To Verify',
       date_requested: new Date().toISOString(),
     });

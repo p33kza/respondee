@@ -1,11 +1,12 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
-import { useRouter } from 'expo-router';
-import logo from '../../assets/images/Logo1.png';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { supabase } from '../../lib/supabase'; // Adjust the import path as necessary
 
 export default function OTPScreen() {
   const router = useRouter();
-  const [otp, setOtp] = useState(['', '', '', '', '']);
+  const { phone } = useLocalSearchParams();
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const inputs = useRef([]);
 
   const handleOtpInput = (value, index) => {
@@ -30,36 +31,45 @@ export default function OTPScreen() {
   };
 
   const clearOtp = () => {
-    setOtp(['', '', '', '', '']);
+    setOtp(['', '', '', '', '', '']);
     inputs.current[0]?.focus();
   };
 
-  useEffect(() => {
-    const allFilled = otp.every((digit) => digit !== '');
-    if (allFilled) {
-      setTimeout(() => {
-        router.push('/auth/mpin');
-      }, 300);
+  const handleVerifyOtp = async () => {
+    const code = otp.join('');
+    if (code.length !== 6) {
+      alert('Please enter the 6-digit OTP sent to your number.');
+      return;
     }
-  }, [otp]);
+
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({
+        phone,
+        token: code,
+        type: 'sms',
+      });
+
+      if (error) throw error;
+
+      router.push('/auth/mpin');
+    } catch (err) {
+      alert(`OTP verification failed: ${err.message}`);
+    }
+  };
 
   return (
     <View style={styles.container}>
-      {/* Progress */}
       <View style={styles.progress}>
         <View style={[styles.bar, styles.complete]} />
         <View style={[styles.bar, styles.active]} />
         <View style={styles.bar} />
       </View>
 
-      {/* Title + Subtext */}
       <Text style={styles.heading}>Enter One-Time-Password</Text>
       <Text style={styles.subText}>
-        Please enter the one-time password (OTP) that was sent to{' '}
-        <Text style={styles.bold}>+639222555100</Text>
+        Please enter the OTP that was sent to <Text style={styles.bold}>{phone}</Text>
       </Text>
 
-      {/* OTP Label and Clear */}
       <View style={styles.otpTopRow}>
         <Text style={styles.otpLabel}>OTP</Text>
         <TouchableOpacity onPress={clearOtp}>
@@ -67,7 +77,6 @@ export default function OTPScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* OTP Input Boxes */}
       <View style={styles.otpRow}>
         {otp.map((digit, index) => (
           <TextInput
@@ -83,27 +92,28 @@ export default function OTPScreen() {
         ))}
       </View>
 
-      {/* Alert */}
+      <TouchableOpacity style={styles.createBtn} onPress={handleVerifyOtp}>
+        <Text style={styles.createBtnText}>Verify OTP</Text>
+      </TouchableOpacity>
+
       <View style={styles.alertBox}>
         <Text style={styles.alertText}>
           ⚠️ Kindly wait for at least <Text style={styles.bold}>3 minutes</Text> for the{' '}
-          <Text style={styles.bold}>OTP</Text> to arrive. Sometimes, there may be delays in
-          receiving it. Thank you for your patience.
+          <Text style={styles.bold}>OTP</Text> to arrive.
         </Text>
       </View>
 
-      {/* Spacer to push footer down */}
       <View style={{ flex: 1 }} />
 
-      {/* Edit Mobile */}
       <Text style={styles.edit}>
-        Not <Text style={styles.bold}>+639222555100</Text>?{' '}
+        Not <Text style={styles.bold}>{phone}</Text>?{' '}
         <Text style={styles.editLink}>Edit mobile number here.</Text>
       </Text>
     </View>
   );
 }
 
+// Styles (same as before)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -201,5 +211,17 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#FF6A00',
     textDecorationLine: 'underline',
+  },
+  createBtn: {
+    backgroundColor: '#FF6A00',
+    paddingVertical: 14,
+    borderRadius: 6,
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  createBtnText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });

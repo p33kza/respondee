@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { View, Text, TextInput, StyleSheet, Pressable, TouchableOpacity, Image } from 'react-native';
 import { useRouter } from 'expo-router';
+import { supabase } from '../../lib/supabase';
 import logo from '../../assets/images/Logo1.png'; // Adjust the path as necessary
 
 export default function RegisterScreen() {
@@ -56,15 +57,22 @@ export default function RegisterScreen() {
         onChangeText={setLastName}
       />
 
-      {/* Email Address Field */}
-      <TextInput
-        placeholder="Email Address"
-        keyboardType="email-address"
-        autoCapitalize="none"
-        style={styles.input}
-        value={email}
-        onChangeText={setEmail}
-      />
+      {/* Phone Number Field */}
+      <View style={styles.phoneInputContainer}>
+        <Text style={styles.flag}>🇵🇭</Text>
+        <Text style={styles.prefix}>+63</Text>
+        <TextInput
+          placeholder="9123456789"
+          keyboardType="number-pad"
+          maxLength={10}
+          style={styles.phoneInput}
+          value={phoneNumber}
+          onChangeText={(text) => {
+            // Allow only digits, and must start with 9
+            if (/^[0-9]{0,10}$/.test(text)) setPhoneNumber(text);
+          }}
+        />
+      </View>
 
       {/* Terms Text */}
       <Text style={styles.terms}>
@@ -73,9 +81,41 @@ export default function RegisterScreen() {
         <Text style={styles.link}>Privacy Policy</Text>.
         </Text>
 
-        <TouchableOpacity style={styles.createBtn} onPress={() => router.push('/auth/otp')}>
-        <Text style={styles.createBtnText}>Create new account</Text>
+        <TouchableOpacity
+          style={styles.createBtn}
+          onPress={async () => {
+            const fullPhone = `+63${phoneNumber}`;
+            if (!/^9\d{9}$/.test(phoneNumber)) {
+              setMessage('Please enter a valid 10-digit PH mobile number starting with 9');
+              return;
+            }
+
+            try {
+              const { error } = await supabase.auth.signInWithOtp({
+                phone: fullPhone,
+                options: {
+                  shouldCreateUser: true,
+                },
+              });
+
+              if (error) throw error;
+
+              router.push({
+                pathname: '/auth/otp',
+                params: { phone: fullPhone },
+              });
+            } catch (err) {
+              console.error('Failed to send OTP:', err);
+              setMessage('Failed to send OTP. Please try again.');
+            }
+          }}
+        >
+          <Text style={styles.createBtnText}>Create new account</Text>
         </TouchableOpacity>
+
+        {message !== '' && (
+          <Text style={{ color: 'red', textAlign: 'center', marginTop: 8 }}>{message}</Text>
+        )}
 
         <View style={{ flex: 1 }} />
         
@@ -242,6 +282,35 @@ const styles = StyleSheet.create({
         borderColor: '#FF6A00',
         borderRadius: 6,
       },
+
+      phoneInputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#ccc',
+        borderRadius: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        backgroundColor: '#fff',
+        marginBottom: 16,
+      },
+      
+      flag: {
+        fontSize: 20,
+        marginRight: 6,
+      },
+      
+      prefix: {
+        fontSize: 16,
+        color: '#333',
+        marginRight: 6,
+      },
+      
+      phoneInput: {
+        flex: 1,
+        fontSize: 16,
+        color: '#000',
+      },      
       
   });
   

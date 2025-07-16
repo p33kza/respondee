@@ -24,20 +24,31 @@ export default function RequestScreen() {
   ];
 
   const handleSubmit = async () => {
+    if (!selectedType) {
+      Alert.alert("Please select a request type.");
+      return;
+    }
+    if (!agreed) {
+      Alert.alert("Please agree to the Terms of Service and Privacy Policy.");
+      return;
+    }
+  
     try {
       await fileRequest({
         request_type: selectedType,
         request_desc: description,
-        emergency: isEmergency
-      })
-      Alert.alert('Request Submitted!')
-      setSelectedType('')
-      setDescription('')
-      setIsEmergency(false)
+        emergency: isEmergency,
+      });
+  
+      Alert.alert("Request Submitted!");
+      setSelectedType("");
+      setDescription("");
+      setIsEmergency(false);
+      setAgreed(false);
     } catch (error) {
-      Alert.alert('Submission Failed', error.message)
+      Alert.alert("Submission Failed", error.message);
     }
-  }
+  };
 
   return (
     <ScrollView style={styles.container}>

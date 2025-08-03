@@ -1,39 +1,28 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  SafeAreaView,
-  Image,
-} from 'react-native';
+import { Image, SafeAreaView, StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 
-export default function WelcomeScreen() {
+export default function Welcome() {
   const router = useRouter();
-
+  
   return (
     <SafeAreaView style={styles.container}>
-      {/* Title */}
       <Text style={styles.welcome}>Welcome!</Text>
-
-      {/* Logo Section */}
+      
       <View style={styles.logoContainer}>
         <Image
-          source={require('../assets/images/Logo1.png')} // speaker icon
+          source={require('../assets/images/Logo1.png')}
           style={styles.logoIcon}
         />
         <Image
-          source={require('../assets/images/Logo.png')} // respondee logo
+          source={require('../assets/images/Logo.png')} 
           style={styles.logoText}
         />
       </View>
-
-
-      {/* Get Started Button */}
+  
       <TouchableOpacity
         style={styles.button}
-        onPress={() => router.push('/auth/register')}
+        onPress={() => router.push('/auth/login')}
       >
         <Text style={styles.buttonText}>Get Started</Text>
       </TouchableOpacity>
@@ -54,11 +43,12 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: '600',
     color: '#FE712D',
-    marginTop: -20,
+    textAlign: 'center',
   },
   logoContainer: {
     alignItems: 'center',
-    marginTop: 20,
+    flex: 1,
+    justifyContent: 'center',
   },
   logoIcon: {
     width: 100,
@@ -71,21 +61,6 @@ const styles = StyleSheet.create({
     height: 40,
     resizeMode: 'contain',
   },
-  dots: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#D0D7DF',
-    marginHorizontal: 4,
-  },
-  activeDot: {
-    backgroundColor: '#0077C8',
-  },
   button: {
     backgroundColor: '#FE712D',
     paddingVertical: 16,
@@ -93,8 +68,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     alignSelf: 'stretch',
-    marginTop: 50,
-    marginBottom: -45,
   },
   buttonText: {
     color: '#fff',

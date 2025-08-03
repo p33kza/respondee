@@ -1,16 +1,20 @@
-import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { View, StyleSheet } from 'react-native';
 
-// Screens
 import HomeScreen from './index';
 import NotificationScreen from './notification';
 import ComplaintScreen from './complaint';
-import HistoryScreen from './history';
 import AccountScreen from './account';
-import RequestScreen from './request'; // ✅ additional screen
+import TrackScreen from './track';
+import ResponseScreen from './responses';
+import SelectRequestTypeScreen from './request-selection';
+import LogisticsScreen from './logistics';
+import LogisticsDetailView from './logisticsView';
+import LogisticsMessageView from './MessageView';
+import ComplaintsDetailView from './complaintsView';
+import MessageView from './MessageView';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -25,28 +29,27 @@ function MainTabs() {
         tabBarLabelStyle: { fontSize: 10 },
       }}
     >
-      {/* Tab Screens */}
-      <Tab.Screen name="index" component={HomeScreen} options={{
+      <Tab.Screen name="Home" component={HomeScreen} options={{
         tabBarLabel: 'Home',
         tabBarIcon: ({ color }) => <Ionicons name="home-outline" size={22} color={color} />
       }} />
-      <Tab.Screen name="notification" component={NotificationScreen} options={{
+      <Tab.Screen name="Notification" component={NotificationScreen} options={{
         tabBarLabel: 'Notification',
         tabBarIcon: ({ color }) => <Ionicons name="notifications-outline" size={22} color={color} />
       }} />
-      <Tab.Screen name="complaint" component={ComplaintScreen} options={{
+      <Tab.Screen name="SelectRequest" component={SelectRequestTypeScreen} options={{
         tabBarLabel: '',
-        tabBarIcon: ({ color }) => (
+        tabBarIcon: () => (
           <View style={styles.middleIconWrapper}>
-            <MaterialCommunityIcons name="account-alert-outline" size={28} color="#fff" />
+            <MaterialCommunityIcons name="plus" size={28} color="#fff" />
           </View>
         )
       }} />
-      <Tab.Screen name="history" component={HistoryScreen} options={{
-        tabBarLabel: 'History',
-        tabBarIcon: ({ color }) => <Ionicons name="time-outline" size={22} color={color} />
+      <Tab.Screen name="Track" component={TrackScreen} options={{
+        tabBarLabel: 'My Requests',
+        tabBarIcon: ({ color }) => <Ionicons name="document-text-outline" size={22} color={color} />
       }} />
-      <Tab.Screen name="account" component={AccountScreen} options={{
+      <Tab.Screen name="Account" component={AccountScreen} options={{
         tabBarLabel: 'Account',
         tabBarIcon: ({ color }) => <Ionicons name="person-outline" size={22} color={color} />
       }} />
@@ -54,19 +57,16 @@ function MainTabs() {
   );
 }
 
-// ✅ FINAL EXPORT GOES HERE
 export default function Layout() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="MainTabs" component={MainTabs} />
       <Stack.Screen name="complaint" component={ComplaintScreen} />
-      <Stack.Screen name="request" component={RequestScreen} />
-      <Stack.Screen name="status" component={RequestScreen} />
-      <Stack.Screen name="responses" component={RequestScreen} />
-      <Stack.Screen name="map" component={RequestScreen} />
-      <Stack.Screen name="analytics" component={RequestScreen} />
-      <Stack.Screen name="faq" component={RequestScreen} />
-      <Stack.Screen name="feedback" component={RequestScreen} />
+      <Stack.Screen name="logistics" component={LogisticsScreen} />
+      <Stack.Screen name="logisticsView" component={LogisticsDetailView} />
+      <Stack.Screen name="complaintsView" component={ComplaintsDetailView} />
+      <Stack.Screen name="MessageView" component={MessageView} />
+      <Stack.Screen name="responses" component={ResponseScreen} />
     </Stack.Navigator>
   );
 }

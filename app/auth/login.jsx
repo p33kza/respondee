@@ -21,11 +21,13 @@ import {
 import { useRouter } from 'expo-router';
 import { useUsers } from '../../hooks/useUsers';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSendOtpEmail } from '../../hooks/useSendOtpEmail';
 
 const { width, height } = Dimensions.get('window');
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { sendOtpEmail } = useSendOtpEmail();
   const [email, setEmail] = useState('');
   const [userId, setUserId] = useState('');
   const [loading, setLoading] = useState(false);
@@ -54,25 +56,7 @@ export default function LoginScreen() {
     setLoading(true);
 
     try {
-      const response = await fetch('https://innovatechservicesph.com/api/email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          api_key: 'A0466E9D-FC3A-4B94-9DB4-1ADBB7F41AAD',
-          smtp_host: 'smtp.hostinger.com',
-          smtp_port: 587,
-          smtp_user: 'support@tcuregistrarrequest.site',
-          smtp_password: '#228JyiuS',
-          use_tls: true,
-          to_email: email,
-          to_name: email,
-          from_name: 'Respondee',
-          subject: 'Your one time OTP Code',
-          body: `<p>Hello,</p><p>Your one time OTP code is: <b>${otp}</b></p>`,
-        }),
-      });
-
-      if (!response.ok) throw new Error('Failed to send OTP');
+      sendOtpEmail(email, users.find(u => u.email === email)?.displayName, otp);
 
       await AsyncStorage.setItem('otp', otp);
       await AsyncStorage.setItem('email', email);

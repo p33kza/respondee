@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useStoredUser } from '../../hooks/useStoredUser';
-import { useUsers, useUpdateUser } from '../../hooks/useUsers';
+import {  usePartialUpdateUser, useUser } from '../../hooks/useUsers';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 
@@ -29,8 +29,8 @@ export default function ProfileScreen() {
   });
 
   const userResult = useStoredUser();
-  const user = userResult || null;
-  const { mutateAsync: updateUserMutation, isPending: isUpdating } = useUpdateUser();
+  const { data: user } = useUser(userResult?.id);
+  const { mutateAsync: updateUserMutation, isPending: isUpdating } = usePartialUpdateUser();
 
   React.useEffect(() => {
     if (user) {
@@ -52,8 +52,6 @@ export default function ProfileScreen() {
           text: 'Logout',
           style: 'destructive',
           onPress: () => {
-            // Implement logout logic here
-            // clearStoredUser();
             AsyncStorage.removeItem('user');
             router.push('/auth/login');
           }
@@ -81,11 +79,16 @@ export default function ProfileScreen() {
     }
 
     try {
-      await updateUserMutation.mutateAsync({
+      await updateUserMutation({
         id: user.id,
-        ...formData
+        updates: formData
       });
       setIsEditing(false);
+      AsyncStorage.removeItem('user')
+      AsyncStorage.setItem('user', JSON.stringify({
+        ...user,
+        ...formData
+      }));
       Alert.alert('Success', 'Profile updated successfully');
     } catch (error) {
       Alert.alert('Error', 'Failed to update profile. Please try again.');
@@ -94,7 +97,6 @@ export default function ProfileScreen() {
   };
 
   const handleCancelEdit = () => {
-    // Reset form data to original user data
     setFormData({
       displayName: user?.displayName || '',
       phone: user?.phone || '',

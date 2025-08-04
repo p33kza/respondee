@@ -31,8 +31,8 @@ export default function HomeScreen() {
   const actions = [
     { label: 'File Complaint', icon: 'document-text-outline', route: '/home/complaint' },
     { label: 'Request Logistics', icon: 'construct-outline', route: '/home/logistics' } , 
-    { label: 'My Requests', icon: 'time-outline', route: '/home/track' },
-    { label: 'About Respondee', icon: 'chatbox-ellipses-outline', route: '/home/responses' },
+    { label: 'My Requests', icon: 'document-outline', route: '/home/track' },
+    { label: 'About Respondee', icon: 'chatbox-outline', route: '/home/about' },
   ];
 
   const stats = {
@@ -237,7 +237,7 @@ export default function HomeScreen() {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recent Requests</Text>
             {userRequests.length > 3 && (
-              <TouchableOpacity onPress={() => router.push('/home/track')}>
+              <TouchableOpacity onPress={() => navigation.navigate('TrackScreen')}>
                 <Text style={styles.viewAllText}>View All</Text>
               </TouchableOpacity>
             )}

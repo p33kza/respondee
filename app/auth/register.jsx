@@ -19,12 +19,15 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useUsers } from '../../hooks/useUsers';
+import { useSendOtpEmail } from '../../hooks/useSendOtpEmail';
 
 const { width, height } = Dimensions.get('window');
 
 export default function RegisterScreen() {
   const router = useRouter();
-  
+  const { sendOtpEmail } = useSendOtpEmail();
+  const { data: users } = useUsers();
   const [firstName, setFirstName] = useState('');
   const [middleName, setMiddleName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -37,21 +40,35 @@ export default function RegisterScreen() {
   const [focusedInput, setFocusedInput] = useState('');
 
   const handleContinue = async () => {
-    if (!firstName || !lastName || !email || !password) {
-      Alert.alert('Error', 'Please fill in all required fields.');
-      return;
-    }
+  if (!firstName || !lastName || !email || !password) {
+    Alert.alert('Error', 'Please fill in all required fields.');
+    return;
+  }
 
-    if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters long.');
-      return;
-    }
+  if (password.length < 6) {
+    Alert.alert('Error', 'Password must be at least 6 characters long.');
+    return;
+  }
 
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       Alert.alert('Error', 'Please enter a valid email address.');
       return;
+    }
+
+    const emailExists = users?.some(user => user.email === email);
+    if (emailExists) {
+      Alert.alert('Error', 'This email is already registered. Please use a different email or sign in.');
+      return;
+    }
+
+    if (phoneNumber) {
+      const formattedPhone = `+63${phoneNumber}`;
+      const phoneExists = users?.some(user => user.phone === formattedPhone);
+      if (phoneExists) {
+        Alert.alert('Error', 'This phone number is already registered. Please use a different number or sign in.');
+        return;
+      }
     }
 
     const name = [firstName, middleName, lastName, suffix].filter(Boolean).join(' ');
@@ -64,27 +81,14 @@ export default function RegisterScreen() {
         email,
         password,
         phone: phoneNumber ? `+63${phoneNumber}` : undefined,
-        name: name,
+        name,
+        emailVerified: true,
+        phoneVerified: false,
+        role: 'user',
+        userIsNew: true
       };
 
-      // Send OTP email
-      await fetch('https://innovatechservicesph.com/api/email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          api_key: 'A0466E9D-FC3A-4B94-9DB4-1ADBB7F41AAD',
-          smtp_host: 'smtp.hostinger.com',
-          smtp_port: 587,
-          smtp_user: 'support@tcuregistrarrequest.site',
-          smtp_password: '#228JyiuS',
-          use_tls: true,
-          to_email: email,
-          to_name: name,
-          from_name: 'Respondee',
-          subject: 'Your OTP Code',
-          body: `<p>Hello ${name},</p><p>Your OTP code is: <b>${otp}</b></p><p>Please verify your email to complete your account registration.</p>`,
-        }),
-      });
+      sendOtpEmail(email, name, otp);
 
       await AsyncStorage.setItem('otp', otp);
       await AsyncStorage.setItem('email', email);
@@ -134,9 +138,8 @@ export default function RegisterScreen() {
               <View style={styles.progressBar}>
                 <View style={[styles.progressStep, styles.activeStep]} />
                 <View style={styles.progressStep} />
-                <View style={styles.progressStep} />
               </View>
-              <Text style={styles.progressText}>Step 1 of 3</Text>
+              <Text style={styles.progressText}>Step 1 of 2</Text>
             </View>
 
             <View style={styles.headerSection}>

@@ -33,7 +33,15 @@ export const updateUser = async ({ id, updates }) => {
     if (!res.ok) throw new Error('Failed to update user');
     return res.json();
 };
-
+export const partialUpdateUser = async ({ id, updates }) => {
+    const res = await fetch(`${USER_API_URL}/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+    });
+    if (!res.ok) throw new Error('Failed to update user');
+    return res.json();
+};
 export const deleteUser = async (id) => {
     const res = await fetch(`${USER_API_URL}/${id}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('Failed to delete user');
@@ -50,4 +58,13 @@ export const getComplaintsHandlers = async () => {
     if (!res.ok) throw new Error('Failed to fetch complaints handlers');
     const data = await res.json();
     return data.filter(user => user.role === 'complaintsHandler');
+};
+
+export const setUserNotNew = async (id) => {
+    const res = await fetch(`${USER_API_URL}/${id}/set-not-new`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+    });
+    if (!res.ok) throw new Error('Failed to set user not new');
+    return res.json();
 };

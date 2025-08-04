@@ -8,14 +8,23 @@ import {
   SafeAreaView,
   Alert,
   ActivityIndicator,
+  StatusBar,
+  Dimensions,
+  Animated,
+  Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRegister } from '../../hooks/useAuth';
+import { Ionicons } from '@expo/vector-icons';
+import { useSendOtpEmail } from '../../hooks/useSendOtpEmail';
+
+const { width, height } = Dimensions.get('window');
 
 export default function OTPRegisterScreen() {
     const router = useRouter();
     const registerMutation = useRegister();
+    const { sendOtpEmail } = useSendOtpEmail();
     const [otp, setOtp] = useState(Array(5).fill(''));
     const [error, setError] = useState('');
     const [storedOtp, setStoredOtp] = useState('');
@@ -23,8 +32,11 @@ export default function OTPRegisterScreen() {
     const [timer, setTimer] = useState(180);
     const [userData, setUserData] = useState(null);
     const [isVerifying, setIsVerifying] = useState(false);
+    const [isResending, setIsResending] = useState(false);
     const inputs = useRef([]);
     const intervalRef = useRef(null);
+    const shakeAnimation = useRef(new Animated.Value(0)).current;
+    const successAnimation = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
         const fetchData = async () => {
@@ -64,39 +76,111 @@ export default function OTPRegisterScreen() {
         }, 1000);
     };
 
+    const shakeOtpBoxes = () => {
+        Animated.sequence([
+        Animated.timing(shakeAnimation, {
+            toValue: 10,
+            duration: 100,
+            useNativeDriver: true,
+        }),
+        Animated.timing(shakeAnimation, {
+            toValue: -10,
+            duration: 100,
+            useNativeDriver: true,
+        }),
+        Animated.timing(shakeAnimation, {
+            toValue: 10,
+            duration: 100,
+            useNativeDriver: true,
+        }),
+        Animated.timing(shakeAnimation, {
+            toValue: 0,
+            duration: 100,
+            useNativeDriver: true,
+        }),
+        ]).start();
+    };
+
+    const showSuccessAnimation = () => {
+        Animated.timing(successAnimation, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+        }).start();
+    };
+
     const handleRegisterUser = async () => {
         if (!userData) {
-        Alert.alert('Error', 'User data not found. Please start registration again.');
-        router.push('/auth/register');
-        return;
+            Alert.alert('Error', 'User data not found. Please start registration again.');
+            router.push('/auth/register');
+            return;
         }
 
         setIsVerifying(true);
+        showSuccessAnimation();
+
         try {
-        await registerMutation.mutateAsync(userData);
-        
-        await AsyncStorage.multiRemove(['otp', 'email', 'pendingUserData']);
-        
-        Alert.alert(
-            'Success!', 
-            'Your account has been created successfully!',
-            [{ text: 'OK', onPress: () => router.push('/auth/login') }]
-        );
+            console.log('Attempting to register user with data:', userData);
+            
+            const response = await registerMutation.mutateAsync(userData);
+            console.log('Registration successful, response:', response);
+            
+            await AsyncStorage.multiRemove(['otp', 'email', 'pendingUserData']);
+            
+            setTimeout(() => {
+            Alert.alert(
+                'Welcome! 🎉',
+                'Your account has been created successfully! You can now sign in.',
+                [{ text: 'Sign In', onPress: () => router.push('/auth/login') }]
+            );
+            }, 1000);
         } catch (err) {
-        console.error('Registration error:', err);
-        let errorMessage = 'Registration failed. Please try again.';
-        
-        if (err?.response?.data?.error?.includes('email-already-exists')) {
+            console.error('Registration error:', {
+            error: err,
+            response: err?.response,
+            data: err?.response?.data,
+            status: err?.response?.status,
+            headers: err?.response?.headers,
+            request: err?.request,
+            });
+            
+            let errorMessage = 'Registration failed. Please try again.';
+            
+            if (err?.response?.data?.error?.includes('email-already-exists')) {
             errorMessage = 'An account with this email already exists.';
-        } else if (err?.response?.data?.error) {
+            } else if (err?.response?.data?.error) {
             errorMessage = err.response.data.error;
+            } else if (err.message) {
+            errorMessage = err.message;
+            } else if (err.code) {
+            errorMessage = `Error code: ${err.code}`;
+            }
+            
+            Alert.alert(
+            'Registration Error',
+            errorMessage,
+            [
+                { text: 'OK', onPress: () => {} },
+                { 
+                text: 'View Details', 
+                onPress: () => {
+                    Alert.alert(
+                    'Error Details',
+                    JSON.stringify({
+                        status: err?.response?.status,
+                        error: err?.response?.data?.error || err.message,
+                        code: err.code,
+                    }, null, 2),
+                    [{ text: 'OK' }]
+                    );
+                }
+                }
+            ]
+            );
+            
+            setIsVerifying(false);
         }
-        
-        Alert.alert('Error', errorMessage);
-        } finally {
-        setIsVerifying(false);
-        }
-    };
+        };
 
     const handleOtpInput = (value, index) => {
         setError('');
@@ -104,22 +188,24 @@ export default function OTPRegisterScreen() {
         newOtp[index] = value;
         setOtp(newOtp);
 
-        // Auto-focus next input
         if (value !== '' && index < inputs.current.length - 1) {
         inputs.current[index + 1].focus();
         }
 
-        // Check if all fields are filled
         const allFilled = newOtp.every((digit) => digit !== '');
         if (allFilled) {
         const enteredOtp = newOtp.join('');
-        if (enteredOtp === storedOtp) {
+        
+        setTimeout(() => {
+            if (enteredOtp === storedOtp) {
             handleRegisterUser();
-        } else {
+            } else {
             setError('Invalid OTP. Please try again.');
             setOtp(['', '', '', '', '']);
-            inputs.current[0]?.focus();
-        }
+            shakeOtpBoxes();
+            setTimeout(() => inputs.current[0]?.focus(), 300);
+            }
+        }, 300);
         }
     };
 
@@ -144,35 +230,21 @@ export default function OTPRegisterScreen() {
         return;
         }
 
+        setIsResending(true);
         const newOtp = Math.floor(10000 + Math.random() * 90000).toString();
         
         try {
-        // Send new OTP email
-        await fetch('https://innovatechservicesph.com/api/email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-            api_key: 'A0466E9D-FC3A-4B94-9DB4-1ADBB7F41AAD',
-            smtp_host: 'smtp.hostinger.com',
-            smtp_port: 587,
-            smtp_user: 'support@tcuregistrarrequest.site',
-            smtp_password: '#228JyiuS',
-            use_tls: true,
-            to_email: email,
-            to_name: userData.displayName,
-            from_name: 'Respondee',
-            subject: 'Your New OTP Code',
-            body: `<p>Hello ${userData.displayName},</p><p>Your new OTP code is: <b>${newOtp}</b></p>`,
-            }),
-        });
+        sendOtpEmail( email, userData.name, newOtp);
 
         await AsyncStorage.setItem('otp', newOtp);
         setStoredOtp(newOtp);
         clearOtp();
         startTimer();
-        Alert.alert('Success', 'New OTP has been sent to your email.');
+        Alert.alert('Code Sent!', 'A new verification code has been sent to your email.');
         } catch (error) {
         Alert.alert('Error', 'Failed to resend OTP. Please try again.');
+        } finally {
+        setIsResending(false);
         }
     };
 
@@ -184,12 +256,13 @@ export default function OTPRegisterScreen() {
 
     const handleEditEmail = () => {
         Alert.alert(
-        'Edit Email',
+        'Change Email Address',
         'To change your email address, you need to start the registration process again.',
         [
             { text: 'Cancel', style: 'cancel' },
             { 
             text: 'Start Over', 
+            style: 'destructive',
             onPress: () => {
                 AsyncStorage.multiRemove(['otp', 'email', 'pendingUserData']);
                 router.push('/auth/register');
@@ -199,100 +272,171 @@ export default function OTPRegisterScreen() {
         );
     };
 
-    if (isVerifying) {
-        return (
-        <SafeAreaView style={[styles.container, styles.centerContent]}>
-            <ActivityIndicator size="large" color="#FF6A00" />
-            <Text style={styles.verifyingText}>Creating your account...</Text>
-        </SafeAreaView>
-        );
-    }
+    const maskedEmail = email ? 
+        email.length > 3 ? 
+        email.substring(0, 3) + '***@' + email.split('@')[1] 
+        : email 
+        : 'your email';
 
     return (
         <SafeAreaView style={styles.container}>
-        {/* Logo */}
-        <View style={styles.logoWrapper}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        
+        {/* Background Elements */}
+        <View style={styles.backgroundGradient} />
+        <View style={styles.backgroundCircle1} />
+        <View style={styles.backgroundCircle2} />
+
+        {/* Header Section */}
+        <View style={styles.headerSection}>
+            {/* Progress Indicator */}
+            <View style={styles.progressContainer}>
+            <View style={styles.progressBar}>
+                <View style={[styles.progressStep, styles.activeStep]} />
+                <View style={[styles.progressStep, styles.activeStep]} />
+            </View>
+            <Text style={styles.progressText}>Final Step</Text>
+            </View>
+
+            {/* Logo and Title */}
+            <View style={styles.logoContainer}>
             <View style={styles.logoCircle}>
-            <Text style={styles.logoText}>LOGO</Text>
+                <View style={styles.checkIcon}>
+                <Ionicons name="mail-outline" size={32} color="#FF9500" />
+                </View>
+            </View>
+            <Text style={styles.title}>Complete Registration</Text>
+            <Text style={styles.subtitle}>
+                Enter the verification code sent to{'\n'}
+                <Text style={styles.emailText}>{maskedEmail}</Text>
+            </Text>
             </View>
         </View>
 
-        {/* Progress */}
-        <View style={styles.progress}>
-            <View style={[styles.bar, styles.active]} />
-            <View style={[styles.bar, styles.active]} />
-            <View style={styles.bar} />
-        </View>
-
-        {/* Title */}
-        <Text style={styles.heading}>Verify Your Email</Text>
-        <Text style={styles.subtext}>
-            Please enter the one-time password (OTP){'\n'}
-            that was sent to <Text style={styles.bold}>{email || 'your email'}</Text>
-        </Text>
-
-        {/* OTP Label + Clear */}
-        <View style={styles.otpTopRow}>
-            <Text style={styles.otpLabel}>OTP</Text>
-            <TouchableOpacity onPress={clearOtp}>
-            <Text style={styles.clear}>clear</Text>  
+        {/* OTP Section */}
+        <View style={styles.otpSection}>
+            <View style={styles.otpHeader}>
+            <Text style={styles.otpLabel}>Verification Code</Text>
+            <TouchableOpacity onPress={clearOtp} activeOpacity={0.7}>
+                <Text style={styles.clearButton}>Clear</Text>
             </TouchableOpacity>
-        </View>
+            </View>
 
-        {/* OTP Inputs */}
-        <View style={styles.otpRow}>
-            {otp.map((digit, i) => (
-            <TextInput
-                key={i}
-                ref={(ref) => (inputs.current[i] = ref)}
-                maxLength={1}
-                keyboardType="number-pad"
-                style={styles.otpBox}
-                value={digit}
-                onChangeText={(val) => handleOtpInput(val, i)}
-                onKeyPress={(e) => handleKeyPress(e, i)}
-                editable={!isVerifying}
-            />
-            ))}
-        </View>
-
-        {/* Error Message */}
-        {error ? (
-            <Text style={styles.errorText}>{error}</Text>
-        ) : null}
-
-        {/* Resend */}
-        <TouchableOpacity 
-            onPress={resendOtp} 
-            disabled={timer > 0 || isVerifying}
-        >
-            <Text
+            {/* OTP Input Boxes */}
+            <Animated.View 
             style={[
-                styles.resend,
-                { color: (timer > 0 || isVerifying) ? '#ccc' : '#FF6A00' },
+                styles.otpContainer,
+                { transform: [{ translateX: shakeAnimation }] }
             ]}
             >
-            {timer > 0 ? `Resend Code in ${formatTime(timer)}` : 'Resend Code'}
-            </Text>
-        </TouchableOpacity>
+            {otp.map((digit, i) => (
+                <View key={i} style={styles.otpBoxWrapper}>
+                <TextInput
+                    ref={(ref) => (inputs.current[i] = ref)}
+                    maxLength={1}
+                    keyboardType="number-pad"
+                    style={[
+                    styles.otpBox,
+                    digit !== '' && styles.otpBoxFilled,
+                    error && styles.otpBoxError
+                    ]}
+                    value={digit}
+                    onChangeText={(val) => handleOtpInput(val, i)}
+                    onKeyPress={(e) => handleKeyPress(e, i)}
+                    textAlign="center"
+                    selectionColor="#FE712D"
+                    editable={!isVerifying}
+                />
+                {digit !== '' && <View style={styles.otpBoxIndicator} />}
+                </View>
+            ))}
+            </Animated.View>
 
-        {/* Alert */}
-        <View style={styles.alertBox}>
-            <Text style={styles.alertText}>
-            ⚠️ Kindly wait for at least <Text style={styles.bold}>3 minutes</Text> for the{' '}
-            <Text style={styles.bold}>OTP</Text> to arrive. Sometimes, there may be delays in
-            receiving it. Thank you for your patience.
+            {/* Error Message */}
+            {error ? (
+            <View style={styles.errorContainer}>
+                <Ionicons name="alert-circle" size={24} color="#FE712D" />
+                <Text style={styles.errorText}>{error}</Text>
+            </View>
+            ) : null}
+        </View>
+
+        {/* Resend Section */}
+        <View style={styles.resendSection}>
+            <Text style={styles.resendTitle}>Didn't receive the code?</Text>
+            <TouchableOpacity 
+            onPress={resendOtp} 
+            disabled={timer > 0 || isResending || isVerifying}
+            activeOpacity={0.7}
+            style={[
+                styles.resendButton,
+                (timer > 0 || isResending || isVerifying) && styles.resendButtonDisabled
+            ]}
+            >
+            {isResending ? (
+                <View style={styles.resendLoadingContainer}>
+                <ActivityIndicator size="small" color="#FE712D" />
+                <Text style={styles.resendButtonText}>Sending...</Text>
+                </View>
+            ) : (
+                <Text style={[
+                styles.resendButtonText,
+                timer > 0 && styles.resendButtonTextDisabled
+                ]}>
+                {timer > 0 ? `Resend in ${formatTime(timer)}` : 'Resend Code'}
+                </Text>
+            )}
+            </TouchableOpacity>
+        </View>
+
+        {/* Info Alert */}
+        <View style={styles.infoContainer}>
+            <View style={styles.infoIcon}>
+            <Ionicons icon="information-circle" size={24} color="#FE712D" />
+            </View>
+            <View style={styles.infoContent}>
+            <Text style={styles.infoTitle}>Please be patient</Text>
+            <Text style={styles.infoText}>
+                It may take up to 3 minutes for the verification code to arrive. Check your spam folder if needed.
+            </Text>
+            </View>
+        </View>
+
+        {/* Footer */}
+        <View style={styles.footerSection}>
+            <Text style={styles.footerText}>
+            Wrong email address? {maskedEmail || ''}
+            <TouchableOpacity onPress={handleEditEmail} activeOpacity={0.7}>
+                <Text style={styles.footerLink}>Change email</Text>
+            </TouchableOpacity>
             </Text>
         </View>
 
-        {/* Spacer + Footer */}
-        <View style={{ flex: 1 }} />
-        <Text style={styles.edit}>
-            Not <Text style={styles.bold}>{email || 'your email'}</Text>?{' '}
-            <TouchableOpacity onPress={handleEditEmail}>
-            <Text style={styles.editLink}>Edit email here.</Text>
-            </TouchableOpacity>
-        </Text>
+        {/* Verification Modal */}
+        <Modal transparent visible={isVerifying} animationType="fade">
+            <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+                <Animated.View 
+                style={[
+                    styles.successIconContainer,
+                    {
+                    transform: [{
+                        scale: successAnimation.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0, 1]
+                        })
+                    }]
+                    }
+                ]}
+                >
+                <Ionicons name="checkmark-circle" size={64} color="#FE712D" />
+                </Animated.View>
+                <Text style={styles.modalTitle}>Creating Your Account</Text>
+                <Text style={styles.modalSubtitle}>Please wait while we set up everything for you...</Text>
+                <ActivityIndicator size="large" color="#FE712D" style={styles.modalSpinner} />
+            </View>
+            </View>
+        </Modal>
         </SafeAreaView>
     );
     }
@@ -300,126 +444,317 @@ export default function OTPRegisterScreen() {
     const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FFFBFC',
-        padding: 24,
-        paddingTop: 40,
+        backgroundColor: '#FFFFFF',
     },
-    centerContent: {
-        justifyContent: 'center',
-        alignItems: 'center',
+    backgroundGradient: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: height * 0.4,
+        backgroundColor: '#FFF8F5',
+        borderBottomLeftRadius: 40,
+        borderBottomRightRadius: 40,
     },
-    logoWrapper: {
+    backgroundCircle1: {
+        position: 'absolute',
+        top: -30,
+        right: -30,
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        backgroundColor: 'rgba(254, 113, 45, 0.1)',
+    },
+    backgroundCircle2: {
+        position: 'absolute',
+        top: 60,
+        left: -20,
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: 'rgba(254, 113, 45, 0.05)',
+    },
+    headerSection: {
+        paddingHorizontal: 24,
+        paddingTop: 20,
         alignItems: 'center',
-        marginBottom: 16,
+        zIndex: 1,
+    },
+    progressContainer: {
+        alignItems: 'center',
+        marginBottom: 32,
+    },
+    progressBar: {
+        flexDirection: 'row',
+        marginBottom: 8,
+    },
+    progressStep: {
+        height: 4,
+        width: 40,
+        backgroundColor: '#E5E7EB',
+        marginHorizontal: 4,
+        borderRadius: 2,
+    },
+    activeStep: {
+        backgroundColor: '#FE712D',
+    },
+    progressText: {
+        fontSize: 14,
+        color: '#FE712D',
+        fontWeight: '600',
+    },
+    logoContainer: {
+        alignItems: 'center',
     },
     logoCircle: {
-        width: 70,
-        height: 70,
-        borderRadius: 35,
-        backgroundColor: '#D0D7DF',
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        backgroundColor: '#FFFFFF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 24,
+        shadowColor: '#000',
+        shadowOffset: {
+        width: 0,
+        height: 4,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        elevation: 5,
+    },
+    checkIcon: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: 'rgba(254, 113, 45, 0.1)',
         justifyContent: 'center',
         alignItems: 'center',
     },
-    logoText: {
-        fontWeight: 'bold',
-        color: '#3E4A5A',
+    checkText: {
+        fontSize: 24,
     },
-    progress: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        marginBottom: 24,
+    title: {
+        fontSize: 28,
+        fontWeight: '800',
+        color: '#1F2937',
+        marginBottom: 12,
+        letterSpacing: -0.5,
     },
-    bar: {
-        height: 5,
-        width: 40,
-        backgroundColor: '#D0D7DF',
-        marginHorizontal: 6,
-        borderRadius: 3,
+    subtitle: {
+        fontSize: 16,
+        color: '#6B7280',
+        textAlign: 'center',
+        lineHeight: 24,
     },
-    active: {
-        backgroundColor: '#FF6A00',
+    emailText: {
+        fontWeight: '600',
+        color: '#FE712D',
     },
-    heading: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#3E4A5A',
-        marginBottom: 8,
+    otpSection: {
+        paddingHorizontal: 24,
+        paddingTop: 40,
+        zIndex: 1,
     },
-    subtext: {
-        fontSize: 14,
-        color: '#5B6B7F',
-        marginBottom: 24,
-    },
-    bold: {
-        fontWeight: 'bold',
-        color: '#3E4A5A',
-    },
-    otpTopRow: {
+    otpHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginBottom: 8,
+        alignItems: 'center',
+        marginBottom: 20,
     },
     otpLabel: {
-        fontWeight: 'bold',
-        color: '#3E4A5A',
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#374151',
     },
-    clear: {
-        color: '#FF6A00',
-        textDecorationLine: 'underline',
+    clearButton: {
+        fontSize: 14,
+        color: '#FE712D',
+        fontWeight: '600',
     },
-    otpRow: {
+    otpContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginBottom: 16,
+        marginBottom: 24,
+    },
+    otpBoxWrapper: {
+        position: 'relative',
     },
     otpBox: {
-        width: 50,
-        height: 50,
-        borderWidth: 1,
-        borderColor: '#ccc',
-        textAlign: 'center',
-        fontSize: 18,
-        borderRadius: 6,
-        backgroundColor: '#fff',
-        color: '#3E4A5A',
+        width: 56,
+        height: 56,
+        borderWidth: 2,
+        borderColor: '#E5E7EB',
+        borderRadius: 12,
+        fontSize: 24,
+        fontWeight: '700',
+        color: '#1F2937',
+        backgroundColor: '#F9FAFB',
+    },
+    otpBoxFilled: {
+        borderColor: '#FE712D',
+        backgroundColor: '#FFFFFF',
+        shadowColor: '#FE712D',
+        shadowOffset: {
+        width: 0,
+        height: 0,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 3,
+    },
+    otpBoxError: {
+        borderColor: '#EF4444',
+        backgroundColor: '#FEF2F2',
+    },
+    otpBoxIndicator: {
+        position: 'absolute',
+        bottom: -8,
+        left: '50%',
+        marginLeft: -3,
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#FE712D',
+    },
+    errorContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#FEF2F2',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        marginBottom: 16,
+    },
+    errorIcon: {
+        fontSize: 16,
+        marginRight: 8,
     },
     errorText: {
-        color: 'red',
-        textAlign: 'center',
-        marginBottom: 10,
+        color: '#EF4444',
         fontSize: 14,
+        fontWeight: '500',
     },
-    resend: {
-        fontWeight: 'bold',
-        textAlign: 'center',
-        marginBottom: 24,
+    resendSection: {
+        paddingHorizontal: 24,
+        paddingTop: 20,
+        alignItems: 'center',
     },
-    alertBox: {
-        backgroundColor: '#FFE5DB',
-        padding: 12,
-        borderRadius: 6,
-        borderLeftWidth: 4,
-        borderLeftColor: '#FF6A00',
-        marginBottom: 24,
-    },
-    alertText: {
-        fontSize: 12,
-        color: '#3E4A5A',
-    },
-    edit: {
+    resendTitle: {
         fontSize: 14,
-        textAlign: 'center',
-        color: '#3E4A5A',
+        color: '#6B7280',
+        marginBottom: 12,
     },
-    editLink: {
-        fontWeight: 'bold',
-        color: '#FF6A00',
-        textDecorationLine: 'underline',
+    resendButton: {
+        paddingVertical: 12,
+        paddingHorizontal: 24,
+        borderRadius: 8,
     },
-    verifyingText: {
-        marginTop: 16,
+    resendButtonDisabled: {
+        opacity: 0.5,
+    },
+    resendLoadingContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    resendButtonText: {
         fontSize: 16,
-        color: '#3E4A5A',
+        color: '#FE712D',
+        fontWeight: '600',
+        marginLeft: 8,
+    },
+    resendButtonTextDisabled: {
+        color: '#9CA3AF',
+        marginLeft: 0,
+    },
+    infoContainer: {
+        flexDirection: 'row',
+        backgroundColor: 'rgba(254, 113, 45, 0.05)',
+        marginHorizontal: 24,
+        marginTop: 32,
+        padding: 16,
+        borderRadius: 12,
+        borderLeftWidth: 4,
+        borderLeftColor: '#FE712D',
+    },
+    infoIcon: {
+        marginRight: 12,
+    },
+    infoIconText: {
+        fontSize: 20,
+    },
+    infoContent: {
+        flex: 1,
+    },
+    infoTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#1F2937',
+        marginBottom: 4,
+    },
+    infoText: {
+        fontSize: 12,
+        color: '#6B7280',
+        lineHeight: 18,
+    },
+    footerSection: {
+        flex: 1,
+        justifyContent: 'flex-end',
+        paddingHorizontal: 24,
+        paddingBottom: 40,
+    },
+    footerText: {
+        fontSize: 14,
+        color: '#6B7280',
         textAlign: 'center',
+    },
+    footerLink: {
+        color: '#FE712D',
+        fontWeight: '600',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    modalContent: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 24,
+        padding: 40,
+        alignItems: 'center',
+        minWidth: 300,
+        shadowColor: '#000',
+        shadowOffset: {
+        width: 0,
+        height: 8,
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 24,
+        elevation: 10,
+    },
+    successIconContainer: {
+        marginBottom: 20,
+    },
+    successIcon: {
+        fontSize: 48,
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#1F2937',
+        marginBottom: 8,
+        textAlign: 'center',
+    },
+    modalSubtitle: {
+        fontSize: 14,
+        color: '#6B7280',
+        textAlign: 'center',
+        marginBottom: 20,
+        lineHeight: 20,
+    },
+    modalSpinner: {
+        marginTop: 12,
     },
 });

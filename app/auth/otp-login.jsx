@@ -15,18 +15,20 @@ import {
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUpdateUser, useUser } from '../../hooks/useUsers';
+import { useSendOtpEmail } from '../../hooks/useSendOtpEmail';
+import { Ionicons } from '@expo/vector-icons';
 
 const { width, height } = Dimensions.get('window');
 
 export default function OTPLoginScreen() {
   const router = useRouter();
+  const { sendOtpEmail } = useSendOtpEmail();
   const [otp, setOtp] = useState(Array(5).fill(''));
   const [error, setError] = useState('');
   const [storedOtp, setStoredOtp] = useState('');
   const [email, setEmail] = useState('');
   const [timer, setTimer] = useState(180);
   const [userId, setUserId] = useState('');
-  const { mutate: updateUser } = useUpdateUser();
   const [isResending, setIsResending] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const inputs = useRef([]);
@@ -112,7 +114,12 @@ export default function OTPLoginScreen() {
           AsyncStorage.removeItem('otp');
           AsyncStorage.removeItem('email');
           AsyncStorage.setItem('user', JSON.stringify(user));
-          router.push('/home');
+          AsyncStorage.setItem('userId', userId)
+          if(user?.userIsNew) {
+            router.push('/auth/new-user');
+          } else {
+            router.push('/home');
+          }
         } else {
           setError('Invalid OTP. Please try again.');
           setOtp(['', '', '', '', '']);
@@ -144,23 +151,7 @@ export default function OTPLoginScreen() {
     const newOtp = Math.floor(10000 + Math.random() * 90000).toString();
     
     try {
-      await fetch('https://innovatechservicesph.com/api/email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          api_key: 'A0466E9D-FC3A-4B94-9DB4-1ADBB7F41AAD',
-          smtp_host: 'smtp.hostinger.com',
-          smtp_port: 587,
-          smtp_user: 'support@tcuregistrarrequest.site',
-          smtp_password: '#228JyiuS',
-          use_tls: true,
-          to_email: email,
-          to_name: email,
-          from_name: 'Respondee',
-          subject: 'Your New OTP Code',
-          body: `<p>Hello,</p><p>Your new OTP code is: <b>${newOtp}</b></p>`,
-        }),
-      });
+      sendOtpEmail(email, user?.displayName, otp);
 
       await AsyncStorage.setItem('otp', newOtp);
       setStoredOtp(newOtp);
@@ -201,16 +192,15 @@ export default function OTPLoginScreen() {
           <View style={styles.progressBar}>
             <View style={[styles.progressStep, styles.activeStep]} />
             <View style={[styles.progressStep, styles.activeStep]} />
-            <View style={styles.progressStep} />
           </View>
-          <Text style={styles.progressText}>Step 2 of 3</Text>
+          <Text style={styles.progressText}>Final Step</Text>
         </View>
 
         {/* Logo and Title */}
         <View style={styles.logoContainer}>
           <View style={styles.logoCircle}>
             <View style={styles.lockIcon}>
-              <Text style={styles.lockText}>🔒</Text>
+              <Ionicons name='lock-closed-outline' size={24} color='#FE712D' />
             </View>
           </View>
           <Text style={styles.title}>Verify Your Email</Text>
@@ -306,9 +296,6 @@ export default function OTPLoginScreen() {
 
       {/* Info Alert */}
       <View style={styles.infoContainer}>
-        <View style={styles.infoIcon}>
-          <Text style={styles.infoIconText}>💡</Text>
-        </View>
         <View style={styles.infoContent}>
           <Text style={styles.infoTitle}>Having trouble?</Text>
           <Text style={styles.infoText}>
@@ -320,7 +307,7 @@ export default function OTPLoginScreen() {
       {/* Footer */}
       <View style={styles.footerSection}>
         <Text style={styles.footerText}>
-          Wrong email address?{' '}
+          Wrong email address? {maskedEmail}
           <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
             <Text style={styles.footerLink}>Change email</Text>
           </TouchableOpacity>
@@ -576,8 +563,8 @@ const styles = StyleSheet.create({
     marginTop: 32,
     padding: 16,
     borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#FE712D',
+    borderWidth: 1,
+    borderColor: '#fe732d3a',
   },
   infoIcon: {
     marginRight: 12,

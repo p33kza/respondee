@@ -18,7 +18,29 @@ export const useCreateUser = () => {
 export const useUpdateUser = () => {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: usersAPI.updateUser,
+        mutationFn: ({ id, updates }) => usersAPI.updateUser({ id, updates }),
+        onSuccess: (_, { id }) => {
+            queryClient.invalidateQueries({ queryKey: ['user', id] });
+            queryClient.invalidateQueries({ queryKey: ['users'] });
+        },
+    });
+};
+
+export const usePartialUpdateUser = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, updates }) => usersAPI.partialUpdateUser({ id, updates }),
+        onSuccess: (_, { id }) => {
+            queryClient.invalidateQueries({ queryKey: ['user', id] });
+            queryClient.invalidateQueries({ queryKey: ['users'] });
+        },
+    });
+};
+
+export const useSetUserNotNew = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (id) => usersAPI.setUserNotNew(id),
         onSuccess: (_, { id }) => {
             queryClient.invalidateQueries({ queryKey: ['user', id] });
             queryClient.invalidateQueries({ queryKey: ['users'] });

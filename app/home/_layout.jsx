@@ -15,6 +15,7 @@ import LogisticsDetailView from './logisticsView';
 import LogisticsMessageView from './MessageView';
 import ComplaintsDetailView from './complaintsView';
 import MessageView from './MessageView';
+import AboutScreen from './about';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -66,6 +67,8 @@ export default function Layout() {
       <Stack.Screen name="logisticsView" component={LogisticsDetailView} />
       <Stack.Screen name="complaintsView" component={ComplaintsDetailView} />
       <Stack.Screen name="MessageView" component={MessageView} />
+      <Stack.Screen name="track" component={TrackScreen} />
+      <Stack.Screen name="about" component={AboutScreen} />
       <Stack.Screen name="responses" component={ResponseScreen} />
     </Stack.Navigator>
   );

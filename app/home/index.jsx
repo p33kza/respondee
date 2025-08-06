@@ -175,6 +175,20 @@ export default function HomeScreen() {
           <Image source={require('../../assets/images/176.png')} style={styles.promoImage} />
         </View>
 
+        {/* Activity Summary */}
+        {stats.unread > 0 && (
+          <View style={styles.activitySection}>
+            <View style={styles.activityCard}>
+              <View style={styles.activityHeader}>
+                <Ionicons name="notifications-outline" size={20} color="#FF8C42" />
+                <Text style={styles.activityTitle}>You have updates</Text>
+              </View>
+              <Text style={styles.activityText}>
+                {stats.unread} unread message{stats.unread > 1 ? 's' : ''} in your requests
+              </Text>
+            </View>
+          </View>
+        )}
         {/* Quick Actions */}
         <View style={styles.quickActionsSection}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
@@ -271,27 +285,6 @@ export default function HomeScreen() {
             </View>
           )}
         </View>
-
-        {/* Activity Summary */}
-        {stats.unread > 0 && (
-          <View style={styles.activitySection}>
-            <View style={styles.activityCard}>
-              <View style={styles.activityHeader}>
-                <Ionicons name="notifications-outline" size={20} color="#FF8C42" />
-                <Text style={styles.activityTitle}>You have updates</Text>
-              </View>
-              <Text style={styles.activityText}>
-                {stats.unread} unread message{stats.unread > 1 ? 's' : ''} in your requests
-              </Text>
-              <TouchableOpacity 
-                style={styles.activityButton}
-                onPress={() => router.push('/home/responses')}
-              >
-                <Text style={styles.activityButtonText}>View Messages</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -340,6 +333,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   name: {
+    maxWidth: 190,
     color: '#334155',
     fontWeight: 'bold',
     fontSize: 18,

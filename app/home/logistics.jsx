@@ -19,6 +19,7 @@ import { useRequests } from '../../hooks/useRequests';
 import { useStoredUser } from '../../hooks/useStoredUser';
 import { router } from 'expo-router';
 import { useAdmins } from '../../hooks/useUsers';
+import { useInventoryItems } from '../../hooks/useInventory';
 
 const requestCategories = [
   { type: 'Event Equipment', icon: 'mic-outline', color: '#FF8C42' },
@@ -44,18 +45,20 @@ export default function LogisticsScreen() {
     const [requestLocation, setRequestLocation] = useState('');
     const [gpsLocation, setGpsLocation] = useState(null);
     const [loadingLocation, setLoadingLocation] = useState(false);
-    const [items, setItems] = useState([{ item: '', quantity: '' }]);
+    const [items, setItems] = useState([{ item: '', itemId: null, quantity: '' }]);
     const [showCategoryModal, setShowCategoryModal] = useState(false);
+    const [showInventoryModal, setShowInventoryModal] = useState(false);
+    const [selectedItemIndex, setSelectedItemIndex] = useState(null);
     
-    // Date states
     const [eventDate, setEventDate] = useState(new Date());
-    const [returnDate, setReturnDate] = useState(new Date(Date.now() + 24 * 60 * 60 * 1000)); // Default to next day
+    const [returnDate, setReturnDate] = useState(new Date(Date.now() + 24 * 60 * 60 * 1000));
     const [showEventDatePicker, setShowEventDatePicker] = useState(false);
     const [showReturnDatePicker, setShowReturnDatePicker] = useState(false);
 
     const user = useStoredUser();
     const { useCreateRequest } = useRequests();
     const { data: admins } = useAdmins();
+    const { data: inventory } = useInventoryItems(); 
     const { mutate: submitRequest, isLoading: isSubmitting } = useCreateRequest();
 
     const getCurrentLocation = useCallback(async () => {
@@ -94,14 +97,34 @@ export default function LogisticsScreen() {
       }
     }, []);
 
-    const handleItemChange = (index, field, value) => {
+    const handleQuantityChange = (index, value) => {
       const updatedItems = [...items];
-      updatedItems[index][field] = value;
+      updatedItems[index].quantity = value;
       setItems(updatedItems);
     };
 
+    const handleInventoryItemSelect = (inventoryItem) => {
+      const updatedItems = [...items];
+      updatedItems[selectedItemIndex] = {
+        item: inventoryItem.name,
+        itemId: inventoryItem.id,
+        quantity: updatedItems[selectedItemIndex].quantity || ''
+      };
+      setItems(updatedItems);
+      setShowInventoryModal(false);
+      setSelectedItemIndex(null);
+    };
+
+    const openInventoryModal = (index) => {
+      setSelectedItemIndex(index);
+      setShowInventoryModal(true);
+    };
+
     const addMoreItems = () => {
-      setItems([...items, { name: '', quantity: '' }]);
+      const newIndex = items.length;
+      setItems([...items, { item: '', itemId: null, quantity: '' }]);
+      setSelectedItemIndex(newIndex);
+      setShowInventoryModal(true);
     };
 
     const removeItem = (index) => {
@@ -123,7 +146,6 @@ export default function LogisticsScreen() {
       setShowEventDatePicker(Platform.OS === 'ios');
       setEventDate(currentDate);
       
-      // Auto-adjust return date if it's before event date
       if (currentDate >= returnDate) {
         setReturnDate(new Date(currentDate.getTime() + 24 * 60 * 60 * 1000));
       }
@@ -133,7 +155,6 @@ export default function LogisticsScreen() {
       const currentDate = selectedDate || returnDate;
       setShowReturnDatePicker(Platform.OS === 'ios');
       
-      // Ensure return date is not before event date
       if (currentDate >= eventDate) {
         setReturnDate(currentDate);
       } else {
@@ -156,14 +177,12 @@ export default function LogisticsScreen() {
         return;
       }
 
-      // Validate items
-      const validItems = items.filter(item => item.item && item.quantity);
+      const validItems = items.filter(item => item.item && item.quantity && item.itemId);
       if (validItems.length === 0) {
         Alert.alert('Error', 'Please add at least one item with quantity.');
         return;
       }
 
-      // Get the final title
       const finalTitle = selectedType === 'Others' ? customCategory : selectedType;
       
       const requestData = {
@@ -200,14 +219,13 @@ export default function LogisticsScreen() {
           });
           Alert.alert('Success', 'Logistics request submitted successfully!', [
             { text: 'OK', onPress: () => {
-              // Reset form or navigate back
               setSelectedType('');
               setCustomCategory('');
               setDescription('');
               setAgreed(false);
               setIsEmergency(false);
               setRequestLocation('');
-              setItems([{ name: '', quantity: '' }]);
+              setItems([{ item: '', itemId: null, quantity: '' }]);
               setEventDate(new Date());
               setReturnDate(new Date(Date.now() + 24 * 60 * 60 * 1000));
             }}
@@ -290,18 +308,21 @@ export default function LogisticsScreen() {
               {items.map((item, index) => (
                 <View key={index} style={styles.itemCard}>
                   <View style={styles.itemRow}>
-                    <TextInput
-                      style={[styles.itemInput, styles.itemNameInput]}
-                      placeholder="Item name"
-                      value={item.item}
-                      onChangeText={(text) => handleItemChange(index, 'item', text)}
-                      placeholderTextColor="#999"
-                    />
+                    <TouchableOpacity 
+                      style={[styles.itemInput, styles.itemNameInput, styles.itemSelector]}
+                      onPress={() => openInventoryModal(index)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.itemSelectorText, !item.item && styles.itemSelectorPlaceholder]}>
+                        {item.item || 'Select Item'}
+                      </Text>
+                      <Ionicons name="chevron-down" size={16} color="#666" />
+                    </TouchableOpacity>
                     <TextInput
                       style={[styles.itemInput, styles.itemQuantityInput]}
                       placeholder="Qty"
                       value={item.quantity}
-                      onChangeText={(text) => handleItemChange(index, 'quantity', text)}
+                      onChangeText={(text) => handleQuantityChange(index, text)}
                       keyboardType="numeric"
                       placeholderTextColor="#999"
                     />
@@ -547,6 +568,68 @@ export default function LogisticsScreen() {
             </View>
           </View>
         </Modal>
+
+        {/* Inventory Selection Modal */}
+        <Modal
+          visible={showInventoryModal}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => {
+            setShowInventoryModal(false);
+            setSelectedItemIndex(null);
+          }}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Select Inventory Item</Text>
+                <TouchableOpacity 
+                  onPress={() => {
+                    setShowInventoryModal(false);
+                    setSelectedItemIndex(null);
+                  }}
+                  style={styles.modalCloseButton}
+                >
+                  <Ionicons name="close" size={24} color="#666" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={styles.modalList}>
+                {inventory?.map((inventoryItem) => (
+                  <TouchableOpacity
+                    key={inventoryItem.id}
+                    style={styles.inventoryItem}
+                    onPress={() => handleInventoryItemSelect(inventoryItem)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.inventoryItemContent}>
+                      <Text style={styles.inventoryItemName}>{inventoryItem.item}</Text>
+                      {inventoryItem.description && (
+                        <Text style={styles.inventoryItemDescription}>{inventoryItem.description}</Text>
+                      )}
+                      <View style={styles.inventoryItemMeta}>
+                        <Text style={[styles.inventoryItemStock, 
+                          inventoryItem.quantity > 0 ? styles.inStock : styles.outOfStock
+                        ]}>
+                          Stock: {inventoryItem.quantity || 0}
+                        </Text>
+                        {inventoryItem.category && (
+                          <Text style={styles.inventoryItemCategory}>{inventoryItem.category}</Text>
+                        )}
+                      </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color="#999" />
+                  </TouchableOpacity>
+                ))}
+                {(!inventory || inventory.length === 0) && (
+                  <View style={styles.emptyInventory}>
+                    <Ionicons name="cube-outline" size={48} color="#999" />
+                    <Text style={styles.emptyInventoryText}>No inventory items available</Text>
+                  </View>
+                )}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
       </View>
     );
   }
@@ -678,6 +761,19 @@ export default function LogisticsScreen() {
     },
     itemNameInput: {
       flex: 2,
+    },
+    itemSelector: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    itemSelectorText: {
+      fontSize: 14,
+      color: '#334155',
+      flex: 1,
+    },
+    itemSelectorPlaceholder: {
+      color: '#9CA3AF',
     },
     itemQuantityInput: {
       flex: 1,
@@ -939,4 +1035,60 @@ export default function LogisticsScreen() {
       color: '#334155',
       flex: 1,
     },
-});
+    // Inventory Modal Styles
+    inventoryItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: '#F3F4F6',
+    },
+    inventoryItemContent: {
+      flex: 1,
+    },
+    inventoryItemName: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: '#334155',
+      marginBottom: 4,
+    },
+    inventoryItemDescription: {
+      fontSize: 14,
+      color: '#6B7280',
+      marginBottom: 6,
+    },
+    inventoryItemMeta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    inventoryItemStock: {
+      fontSize: 12,
+      fontWeight: '500',
+    },
+    inStock: {
+      color: '#059669',
+    },
+    outOfStock: {
+      color: '#DC2626',
+    },
+    inventoryItemCategory: {
+      fontSize: 12,
+      color: '#9CA3AF',
+      backgroundColor: '#F3F4F6',
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: 4,
+    },
+    emptyInventory: {
+      alignItems: 'center',
+      padding: 40,
+      gap: 12,
+    },
+    emptyInventoryText: {
+      fontSize: 16,
+      color: '#9CA3AF',
+      textAlign: 'center',
+    },
+  }
+)

@@ -8,10 +8,12 @@ import {
   RefreshControl,
   ActivityIndicator,
   Alert,
-  TextInput
+  TextInput,
+  Dimensions
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import { useNavigation } from '@react-navigation/native';
 import { 
   useUserNotifications,
   useMarkAsRead,
@@ -22,7 +24,10 @@ import { useStoredUser } from '../../hooks/useStoredUser';
 import { formatDateCustom } from '../../helper/Formatter';
 import { useRequests } from '../../hooks/useRequests';
 
-export default function AccountScreen({ navigation }) {
+const { width } = Dimensions.get('window');
+
+export default function NotificationsScreen() {
+  const navigation = useNavigation();
   const [refreshing, setRefreshing] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -43,11 +48,13 @@ export default function AccountScreen({ navigation }) {
   const { mutate: markAllAsRead } = useMarkAllAsRead();
   const { mutate: clearAllRead } = useClearAllRead();
 
-  const filteredNotifications = useMemo(() => {
-    if (!notifications) return [];
+  // Process and sort notifications
+  const { newNotifications, otherNotifications } = useMemo(() => {
+    if (!notifications) return { newNotifications: [], otherNotifications: [] };
 
     let filtered = [...notifications];
 
+    // Apply search filter
     if (searchQuery.trim()) {
       filtered = filtered.filter(notification =>
         notification.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -56,6 +63,7 @@ export default function AccountScreen({ navigation }) {
       );
     }
 
+    // Apply read/unread filter
     switch (selectedFilter) {
       case 'unread':
         filtered = filtered.filter(notification => !notification.isRead);
@@ -67,10 +75,24 @@ export default function AccountScreen({ navigation }) {
         break;
     }
 
-    return filtered.sort((a, b) => new Date(b.createdAt || b.timestamp) - new Date(a.createdAt || a.timestamp));
+    // Sort function for newest first
+    const sortByDate = (a, b) => {
+      const dateA = new Date(a.createdAt || a.timestamp);
+      const dateB = new Date(b.createdAt || b.timestamp);
+      return dateB - dateA;
+    };
+
+    // Separate and sort new notifications
+    const newNotifs = filtered.filter(n => n.isNew).sort(sortByDate);
+    
+    // Separate and sort other notifications
+    const otherNotifs = filtered.filter(n => !n.isNew).sort(sortByDate);
+
+    return { newNotifications: newNotifs, otherNotifications: otherNotifs };
   }, [notifications, searchQuery, selectedFilter]);
 
   const unreadCount = notifications?.filter(n => !n.isRead).length || 0;
+  const readCount = notifications?.filter(n => n.isRead).length || 0;
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -130,15 +152,12 @@ export default function AccountScreen({ navigation }) {
   };
 
   const handleNotificationPress = (notification) => {
-    // Mark as read when pressed
     if (!notification.isRead) {
       markAsRead(notification.id);
     }
     
-    if(request?.type === 'logistics'){
+    if (notification.requestId) {
       navigation.navigate('logisticsView', { requestId: notification.requestId });
-    } else {
-      navigation.navigate('complaintsView', { requestId: notification.requestId });
     }
   };
 
@@ -169,7 +188,6 @@ export default function AccountScreen({ navigation }) {
   };
 
   const handleClearAllRead = () => {
-    const readCount = notifications?.filter(n => n.isRead).length || 0;
     if (readCount === 0) return;
     
     Alert.alert(
@@ -195,22 +213,22 @@ export default function AccountScreen({ navigation }) {
     );
   };
 
-  const renderNotificationItem = ({ item: notification }) => (
+  const renderNotificationItem = ({ item }) => (
     <TouchableOpacity
       style={[
         styles.notificationItem,
-        !notification.isRead && styles.unreadNotification
+        !item.isRead && styles.unreadNotification
       ]}
-      onPress={() => handleNotificationPress(notification)}
+      onPress={() => handleNotificationPress(item)}
       activeOpacity={0.7}
     >
       <View style={styles.notificationContent}>
         <View style={styles.notificationHeader}>
           <View style={styles.iconContainer}>
             <MaterialIcons
-              name={getNotificationIcon(notification.type)}
+              name={getNotificationIcon(item.type)}
               size={24}
-              color={getNotificationColor(notification.type)}
+              color={getNotificationColor(item.type)}
             />
           </View>
           
@@ -218,20 +236,20 @@ export default function AccountScreen({ navigation }) {
             <View style={styles.titleRow}>
               <Text style={[
                 styles.notificationTitle,
-                !notification.isRead && styles.unreadTitle
+                !item.isRead && styles.unreadTitle
               ]} numberOfLines={1}>
-                {notification.title || 'Notification'}
+                {item.title || 'Notification'}
               </Text>
-              {!notification.isRead && <View style={styles.unreadDot} />}
+              {!item.isRead && <View style={styles.unreadDot} />}
             </View>
             
             <Text style={styles.notificationMessage} numberOfLines={2}>
-              {notification.description || 'No message content'}
+              {item.description || 'No message content'}
             </Text>
             
             <View style={styles.notificationMeta}>
               <Text style={styles.notificationTime}>
-                {formatDateCustom(notification.createdAt || notification.timestamp, 'relative')}
+                {formatDateCustom(item.createdAt || item.timestamp, 'relative')}
               </Text>
             </View>
           </View>
@@ -239,6 +257,40 @@ export default function AccountScreen({ navigation }) {
       </View>
     </TouchableOpacity>
   );
+
+  const renderSectionHeader = (title) => (
+    <View style={styles.sectionHeader}>
+      <Text style={styles.sectionHeaderText}>{title}</Text>
+    </View>
+  );
+
+  const renderNotifications = () => {
+    const sections = [];
+    
+    if (newNotifications.length > 0) {
+      sections.push(renderSectionHeader('New'));
+      newNotifications.forEach(notification => {
+        sections.push(
+          <View key={`new-${notification.id}`}>
+            {renderNotificationItem({ item: notification })}
+          </View>
+        );
+      });
+    }
+    
+    if (otherNotifications.length > 0) {
+      sections.push(renderSectionHeader('Earlier'));
+      otherNotifications.forEach(notification => {
+        sections.push(
+          <View key={`other-${notification.id}`}>
+            {renderNotificationItem({ item: notification })}
+          </View>
+        );
+      });
+    }
+
+    return sections;
+  };
 
   const FilterButton = ({ filter, title, icon, count }) => (
     <TouchableOpacity
@@ -277,7 +329,7 @@ export default function AccountScreen({ navigation }) {
 
   if (isLoading && !notifications) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color="#FF9500" />
           <Text style={styles.loadingText}>Loading notifications...</Text>
@@ -287,23 +339,25 @@ export default function AccountScreen({ navigation }) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Notifications</Text>
         <View style={styles.headerActions}>
           {unreadCount > 0 && (
             <TouchableOpacity onPress={handleMarkAllAsRead} style={styles.markAllButton}>
-              <Text style={styles.markAllText}>Mark All as Read</Text>
+              <Text style={styles.markAllText}>Mark All Read</Text>
             </TouchableOpacity>
           )}
-          {(notifications?.length - unreadCount) > 0 && (
+          {readCount > 0 && (
             <TouchableOpacity onPress={handleClearAllRead} style={styles.clearAllButton}>
-              <Text style={styles.clearAllText}>Clear All Read</Text>
+              <Text style={styles.clearAllText}>Clear Read</Text>
             </TouchableOpacity>
           )}
         </View>
       </View>
 
+      {/* Search */}
       <View style={styles.searchContainer}>
         <MaterialIcons name="search" size={20} color="#8E8E93" style={styles.searchIcon} />
         <TextInput
@@ -312,6 +366,8 @@ export default function AccountScreen({ navigation }) {
           value={searchQuery}
           onChangeText={setSearchQuery}
           placeholderTextColor="#8E8E93"
+          returnKeyType="search"
+          blurOnSubmit={true}
         />
         {searchQuery.length > 0 && (
           <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearButton}>
@@ -320,6 +376,7 @@ export default function AccountScreen({ navigation }) {
         )}
       </View>
 
+      {/* Filters */}
       <View style={styles.filterContainer}>
         <FilterButton 
           filter="all" 
@@ -337,49 +394,55 @@ export default function AccountScreen({ navigation }) {
           filter="read" 
           title="Read" 
           icon="drafts" 
-          count={(notifications?.length || 0) - unreadCount} 
+          count={readCount} 
         />
       </View>
 
+      {/* Notifications List */}
       <FlatList
-        data={filteredNotifications}
-        renderItem={renderNotificationItem}
-        keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
+        data={[]}
+        keyExtractor={(item) => item.id}
+        renderItem={null}
+        ListHeaderComponent={
+          <>
+            {renderNotifications()}
+            {newNotifications.length === 0 && otherNotifications.length === 0 && (
+              <View style={[styles.emptyState, { flex: 1 }]}>
+                <MaterialIcons 
+                  name={
+                    searchQuery || selectedFilter !== 'all' 
+                      ? "search-off" 
+                      : selectedFilter === 'unread' 
+                        ? "notifications-off" 
+                        : "notifications"
+                  } 
+                  size={64} 
+                  color="#C7C7CC" 
+                />
+                <Text style={styles.emptyTitle}>
+                  {searchQuery || selectedFilter !== 'all'
+                    ? "No Matching Notifications"
+                    : selectedFilter === 'unread'
+                      ? "No Unread Notifications"
+                      : "No Notifications"}
+                </Text>
+                <Text style={styles.emptyText}>
+                  {searchQuery || selectedFilter !== 'all'
+                    ? "Try adjusting your search or filters"
+                    : selectedFilter === 'unread'
+                      ? "All caught up! No new notifications."
+                      : "You don't have any notifications yet."}
+                </Text>
+              </View>
+            )}
+          </>
+        }
         style={styles.notificationsList}
-        contentContainerStyle={styles.notificationsContent}
+        contentContainerStyle={[styles.notificationsContent, { paddingBottom: 40 }]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
-        ListEmptyComponent={() => (
-          <View style={styles.emptyState}>
-            <MaterialIcons 
-              name={
-                searchQuery || selectedFilter !== 'all' 
-                  ? "search-off" 
-                  : selectedFilter === 'unread' 
-                    ? "notifications-off" 
-                    : "notifications"
-              } 
-              size={64} 
-              color="#C7C7CC" 
-            />
-            <Text style={styles.emptyTitle}>
-              {searchQuery || selectedFilter !== 'all'
-                ? "No Matching Notifications"
-                : selectedFilter === 'unread'
-                  ? "No Unread Notifications"
-                  : "No Notifications"}
-            </Text>
-            <Text style={styles.emptyText}>
-              {searchQuery || selectedFilter !== 'all'
-                ? "Try adjusting your search or filters"
-                : selectedFilter === 'unread'
-                  ? "All caught up! No new notifications."
-                  : "You don't have any notifications yet."}
-            </Text>
-          </View>
-        )}
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator={true}
       />
     </SafeAreaView>
   );
@@ -407,35 +470,43 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 20,
     paddingVertical: 16,
+    minHeight: 60,
   },
   headerActions: {
-    flexDirection: 'row',
-    gap: 8,
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    gap: 6,
+    maxWidth: width * 0.4,
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: 'bold',
     color: '#000000',
+    flex: 1,
   },
   markAllButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 6,
     backgroundColor: '#FF9500',
+    minWidth: 80,
+    alignItems: 'center',
   },
   markAllText: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#FFFFFF',
     fontWeight: '500',
   },
   clearAllButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 6,
     backgroundColor: '#E5E5EA',
+    minWidth: 80,
+    alignItems: 'center',
   },
   clearAllText: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#000000',
     fontWeight: '500',
   },
@@ -514,16 +585,17 @@ const styles = StyleSheet.create({
   },
   notificationsList: {
     flex: 1,
+    width: '100%',
   },
   notificationsContent: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingBottom: 40,
   },
   notificationItem: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
     marginBottom: 8,
+    marginHorizontal: 16,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -532,6 +604,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
+    minHeight: 90,
   },
   unreadNotification: {
     borderLeftWidth: 3,
@@ -583,15 +656,23 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  notificationType: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#FF9500',
-    letterSpacing: 0.5,
-  },
   notificationTime: {
     fontSize: 12,
     color: '#8E8E93',
+  },
+  sectionHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#f8f8f8',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    marginTop: 8,
+  },
+  sectionHeaderText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+    textTransform: 'uppercase',
   },
   emptyState: {
     alignItems: 'center',

@@ -8,13 +8,17 @@ import {
   RefreshControl,
   ActivityIndicator,
   TextInput,
-  Modal
+  Modal,
+  SafeAreaView,
+  Dimensions
 } from "react-native";
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useRequests } from "../../hooks/useRequests";
 import { useStoredUser } from "../../hooks/useStoredUser";
 import { useNavigation } from "@react-navigation/native";
 import { formatDateCustom } from "../../helper/Formatter";
+
+const { width, height } = Dimensions.get('window');
 
 export default function TrackScreen() {
   const navigation = useNavigation();
@@ -23,20 +27,17 @@ export default function TrackScreen() {
   const [selectedType, setSelectedType] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
   const [showFilters, setShowFilters] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const user = useStoredUser();
-  
-  const { useGetRequestsByUser } = useRequests();
-  const { data: requests = [], loading, refetch } = useGetRequestsByUser(user?.id);
-  const [refreshing, setRefreshing] = React.useState(false);
+  const { data: requests = [], loading, refetch } = useRequests().useGetRequestsByUser(user?.id);
+  const { mutate: updateRequest } = useRequests().usePartialUpdateRequest();
 
-  // Improved filtering and sorting logic
   const filteredAndSortedRequests = useMemo(() => {
     if (!requests || !Array.isArray(requests)) return [];
 
     let filtered = [...requests];
 
-    // Apply search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(request => {
@@ -49,7 +50,6 @@ export default function TrackScreen() {
       });
     }
 
-    // Apply status filter
     if (selectedStatus !== 'all') {
       filtered = filtered.filter(request => {
         if (!request.status) return false;
@@ -57,7 +57,6 @@ export default function TrackScreen() {
       });
     }
 
-    // Apply type filter
     if (selectedType !== 'all') {
       filtered = filtered.filter(request => {
         if (!request.type) return false;
@@ -65,7 +64,6 @@ export default function TrackScreen() {
       });
     }
 
-    // Apply sorting
     return filtered.sort((a, b) => {
       const dateA = a.dateSubmitted || a.createdAt;
       const dateB = b.dateSubmitted || b.createdAt;
@@ -87,9 +85,7 @@ export default function TrackScreen() {
   const onRefresh = async () => {
     setRefreshing(true);
     try {
-      if (refetch && typeof refetch === 'function') {
-        await refetch();
-      }
+      await refetch();
     } catch (error) {
       console.error('Error refreshing requests:', error);
     } finally {
@@ -104,31 +100,24 @@ export default function TrackScreen() {
     setSortBy('newest');
   };
 
-  // Improved status color mapping
   const getStatusColor = (status) => {
     if (!status) return '#8f938eff';
     
     const statusLower = status.toLowerCase();
     
     switch (statusLower) {
-      case 'pending':
-        return '#FF9500';
+      case 'pending': return '#FF9500';
       case 'in progress':
-      case 'processing':
-        return '#334155';
+      case 'processing': return '#334155';
       case 'completed':
-      case 'done':
-        return '#34C759';
+      case 'done': return '#34C759';
       case 'rejected':
       case 'cancelled':
-      case 'denied':
-        return '#FF3B30';
-      default:
-        return '#8f938eff';
+      case 'denied': return '#FF3B30';
+      default: return '#8f938eff';
     }
   };
 
-  // Improved request type icon mapping
   const getRequestTypeIcon = (type) => {
     if (!type) return 'assignment';
     
@@ -136,69 +125,47 @@ export default function TrackScreen() {
     
     switch (typeLower) {
       case 'complaint':
-      case 'complaints':
-        return 'report-problem';
+      case 'complaints': return 'report-problem';
       case 'logistic':
-      case 'logistics':
-        return 'local-shipping';
-      case 'support':
-        return 'help';
-      case 'maintenance':
-        return 'build';
-      default:
-        return 'assignment';
+      case 'logistics': return 'local-shipping';
+      case 'support': return 'help';
+      case 'maintenance': return 'build';
+      default: return 'assignment';
     }
   };
 
-  // Improved getUniqueStatuses
   const getUniqueStatuses = () => {
     if (!requests || !Array.isArray(requests)) return [];
-    
-    const statuses = requests
-      .map(req => req.status?.toLowerCase())
-      .filter(Boolean)
-      .filter((status, index, self) => self.indexOf(status) === index);
-    
-    return statuses;
+    return [...new Set(requests.map(req => req.status?.toLowerCase()).filter(Boolean))];
   };
 
-  // Improved getUniqueTypes
   const getUniqueTypes = () => {
     if (!requests || !Array.isArray(requests)) return [];
-    
-    const types = requests
-      .map(req => req.type?.toLowerCase())
-      .filter(Boolean)
-      .filter((type, index, self) => self.indexOf(type) === index);
-    
-    return types;
+    return [...new Set(requests.map(req => req.type?.toLowerCase()).filter(Boolean))];
   };
 
   const getSortIcon = () => {
     switch (sortBy) {
-      case 'oldest':
-        return 'arrow-upward';
-      case 'title':
-        return 'sort-by-alpha';
-      case 'status':
-        return 'label';
+      case 'oldest': return 'arrow-upward';
+      case 'title': return 'sort-by-alpha';
+      case 'status': return 'label';
       case 'newest':
-      default:
-        return 'arrow-downward';
+      default: return 'arrow-downward';
     }
   };
 
   const RequestCard = ({ request }) => (
-    <TouchableOpacity style={styles.requestCard} activeOpacity={0.7}
+    <TouchableOpacity 
+      style={styles.requestCard} 
+      activeOpacity={0.7}
       onPress={() => {
         if (request.type === 'logistics') {
-          navigation.navigate('logisticsView', { requestId: request.id })
+          navigation.navigate('logisticsView', { requestId: request.id });
+        } else if (request.type === 'complaints') {
+          navigation.navigate('complaintsView', { requestId: request.id });
         }
-        if (request.type === 'complaints') {
-          navigation.navigate('complaintsView', { requestId: request.id })
-        }
-        }
-      }
+        updateRequest(request?.id, { isNew: false, isRead: false });
+      }}
     >
       <View style={styles.cardHeader}>
         <View style={styles.typeContainer}>
@@ -206,16 +173,12 @@ export default function TrackScreen() {
             name={getRequestTypeIcon(request.type)} 
             size={18} 
             color="#334155" 
-            style={styles.typeIcon}
           />
           <Text style={styles.requestType}>
             {request.type?.toUpperCase() || 'GENERAL'}
           </Text>
         </View>
-        <View style={[
-          styles.statusBadge,
-          { backgroundColor: getStatusColor(request.status) }
-        ]}>
+        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(request.status) }]}>
           <Text style={styles.statusText}>
             {request.status?.toUpperCase() || 'UNKNOWN'}
           </Text>
@@ -238,170 +201,142 @@ export default function TrackScreen() {
   );
 
   const FilterModal = () => (
-  <Modal
-    visible={showFilters}
-    animationType="slide"
-    transparent={true}
-    onRequestClose={() => setShowFilters(false)}
-  >
-    <View style={styles.modalOverlay}>
-      <View style={styles.modalContent}>
-        <View style={styles.modalHeader}>
-          <Text style={styles.modalTitle}>Filter & Sort</Text>
-          <TouchableOpacity onPress={() => setShowFilters(false)}>
-            <MaterialIcons name="close" size={24} color="#000" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Add a container with fixed height */}
-        <View style={{ height: '70%' }}>
+    <Modal
+      visible={showFilters}
+      animationType="slide"
+      transparent={true}
+      onRequestClose={() => setShowFilters(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Filter & Sort</Text>
+            <TouchableOpacity onPress={() => setShowFilters(false)}>
+              <MaterialIcons name="close" size={24} color="#000" />
+            </TouchableOpacity>
+          </View>
+          
           <ScrollView style={styles.modalBody}>
-            {/* Sort Section */}
             <View style={styles.sectionContainer}>
               <Text style={styles.sectionTitle}>Sort By</Text>
-              <View style={styles.optionGroup}>
-                {[
-                  { key: 'newest', label: 'Newest First', icon: 'arrow-downward' },
-                  { key: 'oldest', label: 'Oldest First', icon: 'arrow-upward' },
-                  { key: 'title', label: 'Title A-Z', icon: 'sort-by-alpha' },
-                  { key: 'status', label: 'Status', icon: 'label' }
-                ].map(option => (
-                  <TouchableOpacity
-                    key={option.key}
-                    style={[
-                      styles.optionButton,
-                      sortBy === option.key && styles.selectedOption
-                    ]}
-                    onPress={() => setSortBy(option.key)}
-                  >
-                    <MaterialIcons 
-                      name={option.icon} 
-                      size={20} 
-                      color={sortBy === option.key ? '#334155' : '#8E8E93'} 
-                    />
-                    <Text style={[
-                      styles.optionText,
-                      sortBy === option.key && styles.selectedOptionText
-                    ]}>
-                      {option.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+              {['newest', 'oldest', 'title', 'status'].map((option) => (
+                <TouchableOpacity
+                  key={option}
+                  style={[
+                    styles.optionButton,
+                    sortBy === option && styles.selectedOption
+                  ]}
+                  onPress={() => setSortBy(option)}
+                >
+                  <MaterialIcons 
+                    name={getSortIcon(option)} 
+                    size={20} 
+                    color={sortBy === option ? '#334155' : '#8E8E93'} 
+                  />
+                  <Text style={[
+                    styles.optionText,
+                    sortBy === option && styles.selectedOptionText
+                  ]}>
+                    {option.charAt(0).toUpperCase() + option.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
 
-            {/* Status Section */}
             <View style={styles.sectionContainer}>
               <Text style={styles.sectionTitle}>Status</Text>
-              <View style={styles.optionGroup}>
+              <TouchableOpacity
+                style={[
+                  styles.optionButton,
+                  selectedStatus === 'all' && styles.selectedOption
+                ]}
+                onPress={() => setSelectedStatus('all')}
+              >
+                <MaterialIcons name="select-all" size={20} color={selectedStatus === 'all' ? '#334155' : '#8E8E93'} />
+                <Text style={[
+                  styles.optionText,
+                  selectedStatus === 'all' && styles.selectedOptionText
+                ]}>
+                  All Statuses
+                </Text>
+              </TouchableOpacity>
+              {getUniqueStatuses().map(status => (
                 <TouchableOpacity
+                  key={status}
                   style={[
                     styles.optionButton,
-                    selectedStatus === 'all' && styles.selectedOption
+                    selectedStatus === status && styles.selectedOption
                   ]}
-                  onPress={() => setSelectedStatus('all')}
+                  onPress={() => setSelectedStatus(status)}
                 >
-                  <MaterialIcons 
-                    name="select-all" 
-                    size={20} 
-                    color={selectedStatus === 'all' ? '#334155' : '#8E8E93'} 
-                  />
+                  <View style={[styles.statusDot, { backgroundColor: getStatusColor(status) }]} />
                   <Text style={[
                     styles.optionText,
-                    selectedStatus === 'all' && styles.selectedOptionText
+                    selectedStatus === status && styles.selectedOptionText
                   ]}>
-                    All Statuses
+                    {status.charAt(0).toUpperCase() + status.slice(1)}
                   </Text>
                 </TouchableOpacity>
-                {getUniqueStatuses().map(status => (
-                  <TouchableOpacity
-                    key={status}
-                    style={[
-                      styles.optionButton,
-                      selectedStatus === status && styles.selectedOption
-                    ]}
-                    onPress={() => setSelectedStatus(status)}
-                  >
-                    <View style={[
-                      styles.statusDot,
-                      { backgroundColor: getStatusColor(status) }
-                    ]} />
-                    <Text style={[
-                      styles.optionText,
-                      selectedStatus === status && styles.selectedOptionText
-                    ]}>
-                      {status?.charAt(0).toUpperCase() + status?.slice(1)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+              ))}
             </View>
 
-            {/* Type Section */}
             <View style={styles.sectionContainer}>
               <Text style={styles.sectionTitle}>Type</Text>
-              <View style={styles.optionGroup}>
+              <TouchableOpacity
+                style={[
+                  styles.optionButton,
+                  selectedType === 'all' && styles.selectedOption
+                ]}
+                onPress={() => setSelectedType('all')}
+              >
+                <MaterialIcons name="category" size={20} color={selectedType === 'all' ? '#334155' : '#8E8E93'} />
+                <Text style={[
+                  styles.optionText,
+                  selectedType === 'all' && styles.selectedOptionText
+                ]}>
+                  All Types
+                </Text>
+              </TouchableOpacity>
+              {getUniqueTypes().map(type => (
                 <TouchableOpacity
+                  key={type}
                   style={[
                     styles.optionButton,
-                    selectedType === 'all' && styles.selectedOption
+                    selectedType === type && styles.selectedOption
                   ]}
-                  onPress={() => setSelectedType('all')}
+                  onPress={() => setSelectedType(type)}
                 >
                   <MaterialIcons 
-                    name="category" 
+                    name={getRequestTypeIcon(type)} 
                     size={20} 
-                    color={selectedType === 'all' ? '#334155' : '#8E8E93'} 
+                    color={selectedType === type ? '#334155' : '#8E8E93'} 
                   />
                   <Text style={[
                     styles.optionText,
-                    selectedType === 'all' && styles.selectedOptionText
+                    selectedType === type && styles.selectedOptionText
                   ]}>
-                    All Types
+                    {type.charAt(0).toUpperCase() + type.slice(1)}
                   </Text>
                 </TouchableOpacity>
-                {getUniqueTypes().map(type => (
-                  <TouchableOpacity
-                    key={type}
-                    style={[
-                      styles.optionButton,
-                      selectedType === type && styles.selectedOption
-                    ]}
-                    onPress={() => setSelectedType(type)}
-                  >
-                    <MaterialIcons 
-                      name={getRequestTypeIcon(type)} 
-                      size={20} 
-                      color={selectedType === type ? '#334155' : '#8E8E93'} 
-                    />
-                    <Text style={[
-                      styles.optionText,
-                      selectedType === type && styles.selectedOptionText
-                    ]}>
-                      {type?.charAt(0).toUpperCase() + type?.slice(1)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+              ))}
             </View>
           </ScrollView>
-        </View>
 
-        <View style={styles.modalFooter}>
-          <TouchableOpacity style={styles.clearButton} onPress={clearAllFilters}>
-            <Text style={styles.clearButtonText}>Clear All</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.applyButton} 
-            onPress={() => setShowFilters(false)}
-          >
-            <Text style={styles.applyButtonText}>Apply</Text>
-          </TouchableOpacity>
+          <View style={styles.modalFooter}>
+            <TouchableOpacity style={styles.clearButton} onPress={clearAllFilters}>
+              <Text style={styles.clearButtonText}>Clear All</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.applyButton} 
+              onPress={() => setShowFilters(false)}
+            >
+              <Text style={styles.applyButtonText}>Apply</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
-    </View>
-  </Modal>
-);
+    </Modal>
+  );
 
   if (loading && (!requests || requests.length === 0)) {
     return (
@@ -413,7 +348,7 @@ export default function TrackScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Track Requests</Text>
         <Text style={styles.headerSubtitle}>
@@ -488,9 +423,10 @@ export default function TrackScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        {filteredAndSortedRequests && filteredAndSortedRequests.length > 0 ? (
-          filteredAndSortedRequests?.map((request, index) => (
+        {filteredAndSortedRequests.length > 0 ? (
+          filteredAndSortedRequests.map((request, index) => (
             <RequestCard key={request.id || index} request={request} />
           ))
         ) : (
@@ -517,10 +453,13 @@ export default function TrackScreen() {
             )}
           </View>
         )}
+        
+        {/* Add extra space at the bottom */}
+        <View style={{ height: 40 }} />
       </ScrollView>
 
       <FilterModal />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -560,16 +499,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: 16,
     paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
   },
   searchContainer: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#F2F2F7',
     borderRadius: 10,
     paddingHorizontal: 12,
     marginRight: 12,
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
   },
   searchIcon: {
     marginRight: 8,
@@ -578,6 +517,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     color: '#000000',
+    paddingVertical: 8,
   },
   clearSearchButton: {
     padding: 2,
@@ -585,11 +525,10 @@ const styles = StyleSheet.create({
   filterButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 8,
+    backgroundColor: '#F2F2F7',
+    borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
   },
   activeFiltersContainer: {
     flexDirection: 'row',
@@ -635,9 +574,11 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    width: '100%',
   },
   scrollContent: {
     padding: 16,
+    paddingBottom: 40,
   },
   requestCard: {
     backgroundColor: '#FFFFFF',
@@ -645,10 +586,7 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3.84,
     elevation: 5,
@@ -663,14 +601,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  typeIcon: {
-    marginRight: 8,
-  },
   requestType: {
     fontSize: 12,
     fontWeight: '600',
     color: '#334155',
     letterSpacing: 0.5,
+    marginLeft: 8,
   },
   statusBadge: {
     paddingHorizontal: 8,
@@ -707,7 +643,7 @@ const styles = StyleSheet.create({
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 200,
+    paddingVertical: height * 0.2,
   },
   emptyTitle: {
     fontSize: 20,
@@ -733,7 +669,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  // Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -743,7 +678,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '80%',
+    maxHeight: height * 0.8,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -759,18 +694,16 @@ const styles = StyleSheet.create({
     color: '#000000',
   },
   modalBody: {
-    flex: 1,
     paddingHorizontal: 20,
+  },
+  sectionContainer: {
+    marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#000000',
-    marginTop: 20,
     marginBottom: 12,
-  },
-  optionGroup: {
-    marginBottom: 20,
   },
   optionButton: {
     flexDirection: 'row',
@@ -787,7 +720,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#8E8E93',
     marginLeft: 12,
-    flex: 1,
   },
   selectedOptionText: {
     color: '#334155',

@@ -137,10 +137,12 @@ const ComplaintScreen = () => {
     };
 
     createRequest(requestData, {
-      onSuccess: () => {
+      onSuccess: (data) => {
         admins?.forEach(admin => {
           createNotification({
             userId: admin.id,
+            requestId: data?.id,
+            requestType: 'complaints',
             title: 'New Complaint',
             description: 'A new complaint has been submitted',
           });

@@ -20,6 +20,7 @@ import { useStoredUser } from '../../hooks/useStoredUser';
 import { router } from 'expo-router';
 import { useAdmins } from '../../hooks/useUsers';
 import { useInventoryItems } from '../../hooks/useInventory';
+import { useCreateNotification } from '../../hooks/useNotifications';
 
 const requestCategories = [
   { type: 'Event Equipment', icon: 'mic-outline', color: '#FF8C42' },
@@ -45,7 +46,7 @@ export default function LogisticsScreen() {
     const [requestLocation, setRequestLocation] = useState('');
     const [gpsLocation, setGpsLocation] = useState(null);
     const [loadingLocation, setLoadingLocation] = useState(false);
-    const [items, setItems] = useState([{ item: '', itemId: null, quantity: '' }]);
+    const [items, setItems] = useState([{ item: '', quantity: '' }]);
     const [showCategoryModal, setShowCategoryModal] = useState(false);
     const [showInventoryModal, setShowInventoryModal] = useState(false);
     const [selectedItemIndex, setSelectedItemIndex] = useState(null);
@@ -60,6 +61,7 @@ export default function LogisticsScreen() {
     const { data: admins } = useAdmins();
     const { data: inventory } = useInventoryItems(); 
     const { mutate: submitRequest, isLoading: isSubmitting } = useCreateRequest();
+    const { mutate: createNotification } = useCreateNotification();
 
     const getCurrentLocation = useCallback(async () => {
       setLoadingLocation(true);
@@ -106,9 +108,8 @@ export default function LogisticsScreen() {
     const handleInventoryItemSelect = (inventoryItem) => {
       const updatedItems = [...items];
       updatedItems[selectedItemIndex] = {
-        item: inventoryItem.name,
-        itemId: inventoryItem.id,
-        quantity: updatedItems[selectedItemIndex].quantity || ''
+        item: inventoryItem.item || '',
+        quantity: updatedItems[selectedItemIndex].quantity || '1'
       };
       setItems(updatedItems);
       setShowInventoryModal(false);
@@ -122,7 +123,7 @@ export default function LogisticsScreen() {
 
     const addMoreItems = () => {
       const newIndex = items.length;
-      setItems([...items, { item: '', itemId: null, quantity: '' }]);
+      setItems([...items, { item: '', quantity: '' }]);
       setSelectedItemIndex(newIndex);
       setShowInventoryModal(true);
     };
@@ -177,9 +178,9 @@ export default function LogisticsScreen() {
         return;
       }
 
-      const validItems = items.filter(item => item.item && item.quantity && item.itemId);
+      const validItems = items.filter(item => item.item?.trim() && item.quantity?.trim());
       if (validItems.length === 0) {
-        Alert.alert('Error', 'Please add at least one item with quantity.');
+        Alert.alert('Error', 'Please add at least one valid item with quantity.');
         return;
       }
 
@@ -190,31 +191,35 @@ export default function LogisticsScreen() {
         title: finalTitle,
         description,
         status: 'pending',
-        priority: isEmergency ? 'high' : 'medium',
+        priority: isEmergency ? 'high' : 'medium', // Changed to match your dataset
         userId: user?.id,
         logisticsObj: {
-          items: validItems,
+          items: validItems.map(item => ({
+            item: item.item,
+            quantity: item.quantity
+          })),
           eventDate: eventDate.toISOString(),
           returnDate: returnDate.toISOString(),
           location: requestLocation,
-          isSynced: false,
-          isReturned: false,
+          isReturned: false // Added to match your dataset
         },
         date: new Date().toISOString(),
         isStarred: false,
         isSpam: false,
         isRead: false,
         isNew: true,
-        labelAs: 'none'
+        labelAs: 'none' // Simplified to match your dataset
       };
 
       submitRequest(requestData, {
-        onSuccess: () => {
+        onSuccess: (data) => {
           admins?.forEach(admin => {
             createNotification({
               userId: admin.id,
-              title: 'New Logistics Submitted.',
-              description: 'A new logistics request has been submitted',
+              requestId: data?.id,
+              requestType: 'logistics',
+              title: 'New Logistics Request',
+              description: `A new logistics request for ${finalTitle} has been submitted`,
             });
           });
           Alert.alert('Success', 'Logistics request submitted successfully!', [
@@ -225,7 +230,7 @@ export default function LogisticsScreen() {
               setAgreed(false);
               setIsEmergency(false);
               setRequestLocation('');
-              setItems([{ item: '', itemId: null, quantity: '' }]);
+              setItems([{ item: '', quantity: '' }]);
               setEventDate(new Date());
               setReturnDate(new Date(Date.now() + 24 * 60 * 60 * 1000));
             }}
@@ -596,7 +601,7 @@ export default function LogisticsScreen() {
               <ScrollView style={styles.modalList}>
                 {inventory?.map((inventoryItem) => (
                   <TouchableOpacity
-                    key={inventoryItem.id}
+                    key={inventoryItem.item}
                     style={styles.inventoryItem}
                     onPress={() => handleInventoryItemSelect(inventoryItem)}
                     activeOpacity={0.7}
@@ -632,463 +637,461 @@ export default function LogisticsScreen() {
         </Modal>
       </View>
     );
-  }
+}
 
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: '#ffffffff',
-    },
-    scrollView: {
-      flex: 1,
-    },
-    scrollContent: {
-      paddingBottom: 80,
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      backgroundColor: '#fff',
-      paddingHorizontal: 20,
-      paddingTop: 20,
-      paddingBottom: 16,
-    },
-    headerTitle: {
-      flexDirection: 'column',
-    },
-    title: {
-      fontSize: 24,
-      fontWeight: 'bold',
-      color: '#334155',
-    },
-    subtitle: {
-      fontSize: 14,
-      color: '#64748B',
-      lineHeight: 20,
-    },
-    section: {
-      backgroundColor: '#fff',
-      paddingHorizontal: 20,
-      paddingVertical: 16,
-    },
-    link: {
-      color: '#FF8C42',
-    },
-    sectionLabel: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: '#334155',
-      marginBottom: 8,
-      lineHeight: 20,
-    },
-    required: {
-      color: '#EF4444',
-      fontSize: 16,
-    },
-    dropdownButton: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      borderWidth: 1.5,
-      borderColor: '#D1D5DB',
-      borderRadius: 12,
-      padding: 14,
-      backgroundColor: '#fff',
-      minHeight: 52,
-    },
-    dropdownButtonSelected: {
-      borderColor: '#FF8C42',
-      backgroundColor: '#FFF7ED',
-    },
-    dropdownContent: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      flex: 1,
-    },
-    categoryIcon: {
-      width: 24,
-      height: 24,
-      borderRadius: 12,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginRight: 10,
-    },
-    dropdownText: {
-      fontSize: 16,
-      color: '#334155',
-      flex: 1,
-    },
-    placeholder: {
-      color: '#9CA3AF',
-    },
-    customCategoryContainer: {
-      marginTop: 12,
-    },
-    customInput: {
-      borderWidth: 1.5,
-      borderColor: '#D1D5DB',
-      borderRadius: 12,
-      padding: 14,
-      backgroundColor: '#fff',
-      fontSize: 16,
-      color: '#334155',
-      minHeight: 52,
-    },
-    itemsContainer: {
-      gap: 8,
-    },
-    itemCard: {
-      backgroundColor: '#F8FAFC',
-      borderRadius: 12,
-      padding: 12,
-      borderWidth: 1,
-      borderColor: '#E2E8F0',
-    },
-    itemRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-    },
-    itemInput: {
-      borderWidth: 1,
-      borderColor: '#D1D5DB',
-      borderRadius: 8,
-      padding: 10,
-      backgroundColor: '#fff',
-      fontSize: 14,
-      color: '#334155',
-    },
-    itemNameInput: {
-      flex: 2,
-    },
-    itemSelector: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-    },
-    itemSelectorText: {
-      fontSize: 14,
-      color: '#334155',
-      flex: 1,
-    },
-    itemSelectorPlaceholder: {
-      color: '#9CA3AF',
-    },
-    itemQuantityInput: {
-      flex: 1,
-      textAlign: 'center',
-    },
-    removeItemButton: {
-      padding: 4,
-    },
-    backButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: '#FFFFFF',
-      justifyContent: 'center',
-      alignItems: 'center',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
-    },
-    addMoreButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 12,
-      borderWidth: 1.5,
-      borderColor: '#FF8C42',
-      borderRadius: 12,
-      backgroundColor: '#FFF7ED',
-      gap: 6,
-    },
-    addMoreText: {
-      color: '#FF8C42',
-      fontWeight: '600',
-      fontSize: 14,
-    },
-    dateRow: {
-      flexDirection: 'row',
-      gap: 12,
-    },
-    dateContainer: {
-      flex: 1,
-    },
-    dateLabel: {
-      fontSize: 14,
-      color: '#64748B',
-      marginBottom: 6,
-      fontWeight: '500',
-    },
-    dateButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      borderWidth: 1.5,
-      borderColor: '#D1D5DB',
-      borderRadius: 12,
-      padding: 12,
-      backgroundColor: '#fff',
-      gap: 8,
-    },
-    dateText: {
-      fontSize: 14,
-      color: '#334155',
-      flex: 1,
-    },
-    textArea: {
-      borderWidth: 1.5,
-      borderColor: '#D1D5DB',
-      borderRadius: 12,
-      padding: 14,
-      minHeight: 100,
-      backgroundColor: '#fff',
-      fontSize: 16,
-      color: '#334155',
-      lineHeight: 22,
-    },
-    charCount: {
-      fontSize: 12,
-      color: '#9CA3AF',
-      textAlign: 'right',
-      marginTop: 6,
-    },
-    locationContainer: {
-      flexDirection: 'row',
-      gap: 8,
-    },
-    locationInputContainer: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      borderWidth: 1.5,
-      borderColor: '#D1D5DB',
-      borderRadius: 12,
-      backgroundColor: '#fff',
-      paddingHorizontal: 14,
-      minHeight: 52,
-    },
-    locationIcon: {
-      marginRight: 8,
-    },
-    locationInput: {
-      flex: 1,
-      fontSize: 16,
-      color: '#334155',
-    },
-    gpsButton: {
-      backgroundColor: '#FF8C42',
-      borderRadius: 12,
-      padding: 14,
-      justifyContent: 'center',
-      alignItems: 'center',
-      minWidth: 52,
-    },
-    gpsButtonLoading: {
-      backgroundColor: '#FEB366',
-    },
-    gpsInfo: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: '#F0FDF4',
-      padding: 10,
-      borderRadius: 8,
-      marginTop: 8,
-      gap: 6,
-    },
-    gpsInfoText: {
-      fontSize: 12,
-      color: '#166534',
-      flex: 1,
-    },
-    emergencyContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      backgroundColor: '#F8FAFC',
-      padding: 14,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: '#E2E8F0',
-    },
-    emergencyInfo: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      flex: 1,
-      gap: 10,
-    },
-    emergencyTextContainer: {
-      flex: 1,
-    },
-    emergencyLabel: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: '#334155',
-      marginBottom: 2,
-    },
-    emergencySubtext: {
-      fontSize: 12,
-      color: '#6B7280',
-    },
-    checkboxRow: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      gap: 10,
-    },
-    checkbox: {
-      width: 20,
-      height: 20,
-      borderRadius: 6,
-      borderWidth: 2,
-      borderColor: '#D1D5DB',
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: '#fff',
-      marginTop: 2,
-    },
-    checkedBox: {
-      backgroundColor: '#FF8C42',
-      borderColor: '#FF8C42',
-    },
-    termsText: {
-      fontSize: 14,
-      color: '#6B7280',
-      flex: 1,
-      lineHeight: 20,
-    },
-    submitBtn: {
-      backgroundColor: '#FF8C42',
-      paddingVertical: 16,
-      paddingHorizontal: 24,
-      borderRadius: 12,
-      alignItems: 'center',
-      marginHorizontal: 20,
-      marginTop: 16,
-      flexDirection: 'row',
-      justifyContent: 'center',
-      gap: 8,
-      shadowColor: '#FF8C42',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.3,
-      shadowRadius: 8,
-      elevation: 4,
-    },
-    submitBtnDisabled: {
-      backgroundColor: '#D1D5DB',
-      shadowOpacity: 0,
-      elevation: 0,
-    },
-    submitText: {
-      color: '#fff',
-      fontWeight: 'bold',
-      fontSize: 16,
-    },
-    submitIcon: {
-      marginLeft: 4,
-    },
-    modalOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      justifyContent: 'flex-end',
-    },
-    modalContent: {
-      backgroundColor: '#fff',
-      borderTopLeftRadius: 24,
-      borderTopRightRadius: 24,
-      maxHeight: '70%',
-    },
-    modalHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      padding: 20,
-      borderBottomWidth: 1,
-      borderBottomColor: '#E2E8F0',
-    },
-    modalTitle: {
-      fontSize: 18,
-      fontWeight: 'bold',
-      color: '#334155',
-    },
-    modalCloseButton: {
-      padding: 4,
-    },
-    modalList: {
-      maxHeight: 400,
-    },
-    modalItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      padding: 16,
-      borderBottomWidth: 1,
-      borderBottomColor: '#F3F4F6',
-      gap: 12,
-    },
-    modalItemSelected: {
-      backgroundColor: '#FFF7ED',
-    },
-    modalItemText: {
-      fontSize: 16,
-      color: '#334155',
-      flex: 1,
-    },
-    // Inventory Modal Styles
-    inventoryItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      padding: 16,
-      borderBottomWidth: 1,
-      borderBottomColor: '#F3F4F6',
-    },
-    inventoryItemContent: {
-      flex: 1,
-    },
-    inventoryItemName: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: '#334155',
-      marginBottom: 4,
-    },
-    inventoryItemDescription: {
-      fontSize: 14,
-      color: '#6B7280',
-      marginBottom: 6,
-    },
-    inventoryItemMeta: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
-    },
-    inventoryItemStock: {
-      fontSize: 12,
-      fontWeight: '500',
-    },
-    inStock: {
-      color: '#059669',
-    },
-    outOfStock: {
-      color: '#DC2626',
-    },
-    inventoryItemCategory: {
-      fontSize: 12,
-      color: '#9CA3AF',
-      backgroundColor: '#F3F4F6',
-      paddingHorizontal: 8,
-      paddingVertical: 2,
-      borderRadius: 4,
-    },
-    emptyInventory: {
-      alignItems: 'center',
-      padding: 40,
-      gap: 12,
-    },
-    emptyInventoryText: {
-      fontSize: 16,
-      color: '#9CA3AF',
-      textAlign: 'center',
-    },
-  }
-)
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#ffffffff',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 80,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fff',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+  },
+  headerTitle: {
+    flexDirection: 'column',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#334155',
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#64748B',
+    lineHeight: 20,
+  },
+  section: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  link: {
+    color: '#FF8C42',
+  },
+  sectionLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#334155',
+    marginBottom: 8,
+    lineHeight: 20,
+  },
+  required: {
+    color: '#EF4444',
+    fontSize: 16,
+  },
+  dropdownButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#D1D5DB',
+    borderRadius: 12,
+    padding: 14,
+    backgroundColor: '#fff',
+    minHeight: 52,
+  },
+  dropdownButtonSelected: {
+    borderColor: '#FF8C42',
+    backgroundColor: '#FFF7ED',
+  },
+  dropdownContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  categoryIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  dropdownText: {
+    fontSize: 16,
+    color: '#334155',
+    flex: 1,
+  },
+  placeholder: {
+    color: '#9CA3AF',
+  },
+  customCategoryContainer: {
+    marginTop: 12,
+  },
+  customInput: {
+    borderWidth: 1.5,
+    borderColor: '#D1D5DB',
+    borderRadius: 12,
+    padding: 14,
+    backgroundColor: '#fff',
+    fontSize: 16,
+    color: '#334155',
+    minHeight: 52,
+  },
+  itemsContainer: {
+    gap: 8,
+  },
+  itemCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  itemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  itemInput: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    padding: 10,
+    backgroundColor: '#fff',
+    fontSize: 14,
+    color: '#334155',
+  },
+  itemNameInput: {
+    flex: 2,
+  },
+  itemSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  itemSelectorText: {
+    fontSize: 14,
+    color: '#334155',
+    flex: 1,
+  },
+  itemSelectorPlaceholder: {
+    color: '#9CA3AF',
+  },
+  itemQuantityInput: {
+    flex: 1,
+    textAlign: 'center',
+  },
+  removeItemButton: {
+    padding: 4,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  addMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderWidth: 1.5,
+    borderColor: '#FF8C42',
+    borderRadius: 12,
+    backgroundColor: '#FFF7ED',
+    gap: 6,
+  },
+  addMoreText: {
+    color: '#FF8C42',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  dateRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  dateContainer: {
+    flex: 1,
+  },
+  dateLabel: {
+    fontSize: 14,
+    color: '#64748B',
+    marginBottom: 6,
+    fontWeight: '500',
+  },
+  dateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#D1D5DB',
+    borderRadius: 12,
+    padding: 12,
+    backgroundColor: '#fff',
+    gap: 8,
+  },
+  dateText: {
+    fontSize: 14,
+    color: '#334155',
+    flex: 1,
+  },
+  textArea: {
+    borderWidth: 1.5,
+    borderColor: '#D1D5DB',
+    borderRadius: 12,
+    padding: 14,
+    minHeight: 100,
+    backgroundColor: '#fff',
+    fontSize: 16,
+    color: '#334155',
+    lineHeight: 22,
+  },
+  charCount: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    textAlign: 'right',
+    marginTop: 6,
+  },
+  locationContainer: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  locationInputContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#D1D5DB',
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    paddingHorizontal: 14,
+    minHeight: 52,
+  },
+  locationIcon: {
+    marginRight: 8,
+  },
+  locationInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#334155',
+  },
+  gpsButton: {
+    backgroundColor: '#FF8C42',
+    borderRadius: 12,
+    padding: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 52,
+  },
+  gpsButtonLoading: {
+    backgroundColor: '#FEB366',
+  },
+  gpsInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 8,
+    gap: 6,
+  },
+  gpsInfoText: {
+    fontSize: 12,
+    color: '#166534',
+    flex: 1,
+  },
+  emergencyContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  emergencyInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 10,
+  },
+  emergencyTextContainer: {
+    flex: 1,
+  },
+  emergencyLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#334155',
+    marginBottom: 2,
+  },
+  emergencySubtext: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#D1D5DB',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    marginTop: 2,
+  },
+  checkedBox: {
+    backgroundColor: '#FF8C42',
+    borderColor: '#FF8C42',
+  },
+  termsText: {
+    fontSize: 14,
+    color: '#6B7280',
+    flex: 1,
+    lineHeight: 20,
+  },
+  submitBtn: {
+    backgroundColor: '#FF8C42',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginHorizontal: 20,
+    marginTop: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    shadowColor: '#FF8C42',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  submitBtnDisabled: {
+    backgroundColor: '#D1D5DB',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  submitText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  submitIcon: {
+    marginLeft: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '70%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#334155',
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalList: {
+    maxHeight: 400,
+  },
+  modalItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+    gap: 12,
+  },
+  modalItemSelected: {
+    backgroundColor: '#FFF7ED',
+  },
+  modalItemText: {
+    fontSize: 16,
+    color: '#334155',
+    flex: 1,
+  },
+  inventoryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  inventoryItemContent: {
+    flex: 1,
+  },
+  inventoryItemName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#334155',
+    marginBottom: 4,
+  },
+  inventoryItemDescription: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 6,
+  },
+  inventoryItemMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  inventoryItemStock: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  inStock: {
+    color: '#059669',
+  },
+  outOfStock: {
+    color: '#DC2626',
+  },
+  inventoryItemCategory: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  emptyInventory: {
+    alignItems: 'center',
+    padding: 40,
+    gap: 12,
+  },
+  emptyInventoryText: {
+    fontSize: 16,
+    color: '#9CA3AF',
+    textAlign: 'center',
+  },
+});

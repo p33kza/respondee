@@ -174,21 +174,7 @@ export default function HomeScreen() {
           </View>
           <Image source={require('../../assets/images/176.png')} style={styles.promoImage} />
         </View>
-
-        {/* Activity Summary */}
-        {stats.unread > 0 && (
-          <View style={styles.activitySection}>
-            <View style={styles.activityCard}>
-              <View style={styles.activityHeader}>
-                <Ionicons name="notifications-outline" size={20} color="#FF8C42" />
-                <Text style={styles.activityTitle}>You have updates</Text>
-              </View>
-              <Text style={styles.activityText}>
-                {stats.unread} unread message{stats.unread > 1 ? 's' : ''} in your requests
-              </Text>
-            </View>
-          </View>
-        )}
+        
         {/* Quick Actions */}
         <View style={styles.quickActionsSection}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
@@ -250,11 +236,6 @@ export default function HomeScreen() {
         <View style={styles.recentSection}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recent Requests</Text>
-            {userRequests.length > 3 && (
-              <TouchableOpacity onPress={() => navigation.navigate('TrackScreen')}>
-                <Text style={styles.viewAllText}>View All</Text>
-              </TouchableOpacity>
-            )}
           </View>
           
           {isLoading ? (

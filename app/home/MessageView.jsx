@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../../firebase';
 import {
   View,
   Text,
@@ -42,25 +44,81 @@ export default function MessageView() {
     const messages = messagesData?.messages || [];
 
     useEffect(() => {
-        setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
+        const timer = setTimeout(() => {
+            scrollViewRef.current?.scrollToEnd({ animated: true });
         }, 100);
+    
+    return () => clearTimeout(timer);
     }, [messages]);
+
+    useEffect(() => {
+        const keyboardDidShowListener = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+            () => {
+            setTimeout(() => {
+                scrollViewRef.current?.scrollToEnd({ animated: true });
+            }, 100);
+            }
+        );
+
+        return () => {
+            keyboardDidShowListener.remove();
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!requestId) return;
+
+        const requestRef = doc(db, 'requests', requestId);
+        const unsubscribe = onSnapshot(requestRef, (docSnapshot) => {
+            const requestData = docSnapshot.data();
+            const updatedMessages = requestData?.messages || [];
+            
+            queryClient.setQueryData(
+            ['requests', requestId, 'messages'],
+            { messages: updatedMessages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))}
+            );
+        });
+
+        return () => unsubscribe(); 
+    }, [requestId]);
 
     const handleSendMessage = async () => {
         if (message.trim() === '') return;
         
+        const newMessage = {
+            requestId,
+            senderId: currentUserId,
+            message: message.trim(),
+            messageType: 'text',
+            timestamp: new Date().toISOString()
+        };
+
+        queryClient.setQueryData(
+            ['requests', requestId, 'messages'],
+            (old) => ({
+            messages: [...(old?.messages || []), newMessage]
+            })
+        );
+
         try {
-        await addMessageMutation.mutateAsync({
-            requestId: requestId,
+            await addMessageMutation.mutateAsync({
+            requestId,
             senderId: currentUserId,
             message: message.trim(),
             messageType: 'text'
-        });
-        setMessage('');
+            });
+            setMessage('');
+            scrollViewRef.current?.scrollToEnd({ animated: true });
         } catch (error) {
-        console.error('Failed to send message:', error);
-        Alert.alert('Error', 'Failed to send message. Please try again.');
+            console.error('Failed to send message:', error);
+            queryClient.setQueryData(
+            ['requests', requestId, 'messages'],
+            (old) => ({
+                messages: old?.messages.filter(m => m.timestamp !== newMessage.timestamp) || []
+            })
+            );
+            Alert.alert('Error', 'Failed to send message. Please try again.');
         }
     };
 
@@ -74,16 +132,18 @@ export default function MessageView() {
     const renderMessage = (msg, index) => {
         const isCurrentUser = msg.senderId === currentUserId;
         const isSystemMessage = msg.messageType === 'system';
+        const isOptimistic = msg.isOptimistic;
         
         return (
-        <View 
-            key={index} 
+            <View 
+            key={`${msg.timestamp}-${index}`}
             style={[
-            styles.messageContainer,
-            isCurrentUser ? styles.sentMessage : styles.receivedMessage,
-            isSystemMessage && styles.systemMessage
+                styles.messageContainer,
+                isCurrentUser ? styles.sentMessage : styles.receivedMessage,
+                isSystemMessage && styles.systemMessage,
+                isOptimistic && styles.optimisticMessage
             ]}
-        >
+            >
             <View style={[
             styles.messageBubble,
             isCurrentUser ? styles.sentBubble : styles.receivedBubble,
@@ -120,6 +180,11 @@ export default function MessageView() {
                 {formatDateCustom(msg.timestamp, 'relative')}
             </Text>
             </View>
+            {isOptimistic && (
+                <View style={styles.sendingIndicator}>
+                <ActivityIndicator size="small" color="#999" />
+                </View>
+            )}
         </View>
         );
     };
@@ -375,5 +440,13 @@ export default function MessageView() {
         color: '#fff',
         fontSize: 16,
         fontWeight: '600',
+    },
+    optimisticMessage: {
+        opacity: 0.7,
+    },
+    sendingIndicator: {
+        position: 'absolute',
+        right: 10,
+        top: 10,
     },
 });

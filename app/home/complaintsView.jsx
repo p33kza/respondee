@@ -187,7 +187,7 @@ export default function ComplaintsDetailView() {
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.label}>Assigned To:</Text>
-            <Text style={styles.value}>{getSenderName(request.assignedTo) || 'Unassigned'}</Text>
+            <Text style={styles.value}>{request.assignedTo ? getSenderName(request.assignedTo) : 'Unassigned'}</Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.label}>Request Date:</Text>

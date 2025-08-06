@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { requestsApi } from '../apis/requestAPI';
+import { useRealtimeMessages } from './useRealtimeMessages';
 
 export const useRequests = () => {
   const queryClient = useQueryClient();
@@ -219,22 +220,49 @@ export const useRequests = () => {
   };
 
   const useGetMessages = (requestId) => {
+    useRealtimeMessages(requestId);
+
     return useQuery({
       queryKey: ['requests', requestId, 'messages'],
       queryFn: () => requestsApi.getMessages(requestId),
       enabled: !!requestId,
+      staleTime: Infinity,
     });
   };
 
   const useAddMessage = () => {
+    const queryClient = useQueryClient();
+
     return useMutation({
       mutationFn: ({ requestId, ...messageData }) => 
         requestsApi.addMessage(requestId, messageData),
-      onSuccess: (data, variables) => {
-        queryClient.invalidateQueries(['requests', variables.requestId, 'messages']);
-        queryClient.invalidateQueries(['requests', variables.requestId]);
-        queryClient.invalidateQueries(['requests']);
+      onMutate: async (variables) => {
+        await queryClient.cancelQueries(['requests', variables.requestId, 'messages']);
+        
+        const previousMessages = queryClient.getQueryData(['requests', variables.requestId, 'messages'])?.messages || [];
+        
+        const optimisticMessage = {
+          ...variables,
+          timestamp: new Date().toISOString(),
+          isOptimistic: true
+        };
+        
+        queryClient.setQueryData(
+          ['requests', variables.requestId, 'messages'],
+          { messages: [...previousMessages, optimisticMessage] }
+        );
+        
+        return { previousMessages };
       },
+      onError: (err, variables, context) => {
+        queryClient.setQueryData(
+          ['requests', variables.requestId, 'messages'],
+          { messages: context.previousMessages }
+        );
+      },
+      onSettled: () => {
+        queryClient.invalidateQueries(['requests', requestId, 'messages']);
+      }
     });
   };
 

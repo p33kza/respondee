@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -42,10 +42,15 @@ export default function LogisticsDetailView() {
   const { mutate: returnItems } = useReturnItems();
   const { mutate: addNotification } = useCreateNotification();
   const { mutate: addMessage } = useAddMessage();
+  const { mutate: updateRequest } = useRequests().usePartialUpdateRequest();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [returnQuantity, setReturnQuantity] = useState('');
+
+  useEffect(() => {
+    updateRequest(requestId, {isRead: true, isNew: false})
+  }, [requestId])
 
   const getSenderName = (id) => {
     const user = users.find((u) => u.id === id);
@@ -62,15 +67,42 @@ export default function LogisticsDetailView() {
     });
   };
 
+  // Helper function to calculate returned quantity for a specific item
+  const getReturnedQuantity = (itemName) => {
+    const returnedItems = request?.logisticsObj?.returnedItems || [];
+    return returnedItems
+      .filter(item => item.item === itemName)
+      .reduce((sum, item) => Number(sum) + Number(item.quantity || 0), 0);
+  };
+
+  // Helper function to calculate remaining quantity for a specific item
+  const getRemainingQuantity = (borrowedItem) => {
+    const returnedQty = getReturnedQuantity(borrowedItem.item);
+    return Number(borrowedItem.quantity || 0) - Number(returnedQty);
+  };
+
+  // Helper function to get items with calculated quantities
+  const getItemsWithQuantities = () => {
+    const borrowedItems = request?.logisticsObj?.items || [];
+    return borrowedItems.map(item => ({
+      ...item,
+      returnedQuantity: getReturnedQuantity(item.item),
+      remainingQuantity: getRemainingQuantity(item),
+    }));
+  };
+
   const handleReturnItem = (item) => {
-    setSelectedItem(item);
+    setSelectedItem({
+      ...item,
+      remainingQuantity: getRemainingQuantity(item)
+    });
     setReturnQuantity('');
     setModalVisible(true);
   };
 
   const handleReturnFull = () => {
-    if (selectedItem) {
-      setReturnQuantity(String(selectedItem.quantity));
+    if (selectedItem && selectedItem.remainingQuantity > 0) {
+      setReturnQuantity(String(selectedItem.remainingQuantity));
     }
   };
 
@@ -81,20 +113,34 @@ export default function LogisticsDetailView() {
       Alert.alert('Error', 'Please enter a valid quantity');
       return;
     }
-    if (qty > selectedItem.quantity) {
-      Alert.alert('Error', 'Return quantity cannot exceed available quantity');
+    if (qty > selectedItem.remainingQuantity) {
+      Alert.alert('Error', 'Return quantity cannot exceed remaining quantity');
       return;
     }
 
     const returnData = {
       requestId,
-      returns: [
-        {
-          item: selectedItem.item,
-          quantity: qty,
-        },
-      ],
+      returns: [{
+        item: selectedItem.item,
+        quantity: qty,
+      }],
     };
+
+    const previousRequest = { ...request };
+    const updatedReturnedItems = [
+      ...(request.logisticsObj?.returnedItems || []),
+      { item: selectedItem.item, quantity: qty }
+    ];
+
+    updateRequest(requestId, {
+      logisticsObj: {
+        ...request.logisticsObj,
+        returnedItems: updatedReturnedItems,
+        isReturned: getItemsWithQuantities().every(
+          item => getRemainingQuantity(item) <= 0
+        )
+      }
+    });
 
     returnItems(returnData, {
       onSuccess: () => {
@@ -108,19 +154,24 @@ export default function LogisticsDetailView() {
             description: `${getSenderName(request.userId)} returned ${qty} ${selectedItem.item}(s)`,
           });
         }
+        
         addMessage({
           requestId,
           messageType: 'system',
           message: `${getSenderName(request.userId)} Returned ${qty} ${selectedItem.item}(s)`,
         });
-        setModalVisible(false);
-        setSelectedItem(null);
-        setReturnQuantity('');
       },
       onError: (err) => {
+        // Rollback optimistic update
+        updateRequest(requestId, previousRequest);
         console.error('Return error:', err);
         Alert.alert('Error', err.message || 'Failed to return item');
       },
+      onSettled: () => {
+        setModalVisible(false);
+        setSelectedItem(null);
+        setReturnQuantity('');
+      }
     });
   };
 
@@ -136,20 +187,46 @@ export default function LogisticsDetailView() {
     </View>
   );
 
-  const ItemCard = ({ item }) => (
-    <View style={styles.itemCard}>
-      <View style={styles.itemInfo}>
-        <Text style={styles.itemName}>{item.item}</Text>
-        <Text style={styles.itemQuantity}>Qty: {item.quantity}</Text>
+  const ItemCard = ({ item }) => {
+    const returnedQty = item.returnedQuantity || 0;
+    const remainingQty = item.remainingQuantity || item.quantity || 0;
+    const totalQty = Number(item.quantity || 0);
+    const isFullyReturned = remainingQty <= 0;
+
+    return (
+      <View style={[styles.itemCard, isFullyReturned && styles.itemCardReturned]}>
+        <View style={styles.itemInfo}>
+          <Text style={styles.itemName}>{item.item}</Text>
+          <View style={styles.quantityContainer}>
+            <Text style={styles.itemQuantity}>
+              Total: {totalQty}
+            </Text>
+            {returnedQty > 0 && (
+              <Text style={styles.returnedQuantity}>
+                Returned: {returnedQty}
+              </Text>
+            )}
+            <Text style={[
+              styles.remainingQuantity,
+              { color: isFullyReturned ? '#10B981' : '#FF8C42' }
+            ]}>
+              Remaining: {remainingQty}
+            </Text>
+          </View>
+          {isFullyReturned && (
+            <View style={styles.fullyReturnedBadge}>
+              <Text style={styles.fullyReturnedText}>✓ Fully Returned</Text>
+            </View>
+          )}
+        </View>
+        {request?.status === 'in progress' && !request?.logisticsObj?.isReturned && remainingQty > 0 && (
+          <TouchableOpacity style={styles.returnButton} onPress={() => handleReturnItem(item)}>
+            <Text style={styles.returnButtonText}>Return</Text>
+          </TouchableOpacity>
+        )}
       </View>
-      {/* Fixed: Only show return button for non-pending requests and when items are not fully returned */}
-      {request?.status !== 'pending' && !request?.logisticsObj?.isReturned && (
-        <TouchableOpacity style={styles.returnButton} onPress={() => handleReturnItem(item)}>
-          <Text style={styles.returnButtonText}>Return</Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
+    );
+  };
 
   const MessageBubble = ({ message }) => (
     <View style={styles.messageBubble}>
@@ -176,6 +253,12 @@ export default function LogisticsDetailView() {
       <Text style={styles.syncText}>{isReturned ? 'Returned' : 'Not Returned'}</Text>
     </View>
   );
+
+  // Calculate overall return statistics
+  const itemsWithQuantities = getItemsWithQuantities();
+  const totalItems = itemsWithQuantities.length;
+  const fullyReturnedItems = itemsWithQuantities.filter(item => item.remainingQuantity <= 0).length;
+  const partiallyReturnedItems = itemsWithQuantities.filter(item => item.returnedQuantity > 0 && item.remainingQuantity > 0).length;
 
   return (
     <View style={styles.container}>
@@ -235,11 +318,33 @@ export default function LogisticsDetailView() {
                 <ReturnStatusIndicator isReturned={request.logisticsObj.isReturned} />
               </View>
             )}
-            {request.logisticsObj.items?.length > 0 && (
+
+            {/* Return Statistics */}
+            {totalItems > 0 && request?.status !== 'pending' && (
+              <View style={styles.returnStats}>
+                <Text style={styles.statsTitle}>Return Statistics</Text>
+                <View style={styles.statsContainer}>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statNumber}>{fullyReturnedItems}</Text>
+                    <Text style={styles.statLabel}>Fully Returned</Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Text style={[styles.statNumber, { color: '#F59E0B' }]}>{partiallyReturnedItems}</Text>
+                    <Text style={styles.statLabel}>Partially Returned</Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Text style={[styles.statNumber, { color: '#EF4444' }]}>{totalItems - fullyReturnedItems - partiallyReturnedItems}</Text>
+                    <Text style={styles.statLabel}>Not Returned</Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {itemsWithQuantities.length > 0 && (
               <View style={styles.itemsSection}>
                 <Text style={styles.subSectionTitle}>Items Required</Text>
                 <FlatList
-                  data={request.logisticsObj.items}
+                  data={itemsWithQuantities}
                   keyExtractor={(item, index) => `item-${index}`}
                   renderItem={({ item }) => <ItemCard item={item} />}
                   scrollEnabled={false}
@@ -284,7 +389,13 @@ export default function LogisticsDetailView() {
               <View style={styles.modalItemInfo}>
                 <Text style={styles.modalItemName}>{selectedItem.item}</Text>
                 <Text style={styles.modalItemQuantity}>
-                  Available: {selectedItem.quantity}
+                  Total Borrowed: {selectedItem.quantity}
+                </Text>
+                <Text style={styles.modalItemReturned}>
+                  Already Returned: {getReturnedQuantity(selectedItem.item)}
+                </Text>
+                <Text style={styles.modalItemRemaining}>
+                  Remaining: {selectedItem.remainingQuantity}
                 </Text>
               </View>
             )}
@@ -297,7 +408,7 @@ export default function LogisticsDetailView() {
               placeholder="Enter quantity"
             />
             <TouchableOpacity style={styles.fullReturnButton} onPress={handleReturnFull}>
-              <Text style={styles.fullReturnButtonText}>Return All Items</Text>
+              <Text style={styles.fullReturnButtonText}>Return All Remaining Items</Text>
             </TouchableOpacity>
             <View style={styles.modalActions}>
               <TouchableOpacity
@@ -321,60 +432,60 @@ export default function LogisticsDetailView() {
 }
 
 const styles = StyleSheet.create({
-container: {
+  container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
-},
-scrollView: {
+  },
+  scrollView: {
     flex: 1,
-},
-header: {
+  },
+  header: {
     backgroundColor: '#334155',
     paddingTop: 40,
     paddingBottom: 20,
     paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'flex-start',
-},
-backButton: {
+  },
+  backButton: {
     marginRight: 16,
     padding: 4,
     marginTop: 4,
-},
-backButtonText: {
+  },
+  backButtonText: {
     color: '#FFFFFF',
     fontSize: 24,
     fontWeight: 'bold',
-},
-headerContent: {
+  },
+  headerContent: {
     flex: 1,
-},
-title: {
+  },
+  title: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#FFFFFF',
     marginBottom: 4,
-},
-requestId: {
+  },
+  requestId: {
     fontSize: 14,
     color: '#94A3B8',
     marginBottom: 16,
-},
-badgeContainer: {
+  },
+  badgeContainer: {
     flexDirection: 'row',
     gap: 8,
-},
-badge: {
+  },
+  badge: {
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
-},
-badgeText: {
+  },
+  badgeText: {
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '600',
-},
-section: {
+  },
+  section: {
     backgroundColor: '#FFFFFF',
     margin: 16,
     padding: 16,
@@ -386,59 +497,88 @@ section: {
     elevation: 3,
     borderWidth: 1,
     borderColor: '#F8FAFC',
-},
-sectionTitle: {
+  },
+  sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#334155',
     marginBottom: 16,
-},
-subSectionTitle: {
+  },
+  subSectionTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#334155',
     marginBottom: 12,
     marginTop: 16,
-},
-infoRow: {
+  },
+  infoRow: {
     marginBottom: 12,
-},
-label: {
+  },
+  label: {
     fontSize: 14,
     fontWeight: '600',
     color: '#64748B',
     marginBottom: 4,
-},
-value: {
+  },
+  value: {
     fontSize: 14,
     color: '#334155',
     lineHeight: 20,
-},
-statusRow: {
+  },
+  statusRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 16,
     marginBottom: 8,
-},
-syncContainer: {
+  },
+  syncContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-},
-syncDot: {
+  },
+  syncDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-},
-syncText: {
+  },
+  syncText: {
     fontSize: 14,
     color: '#64748B',
     fontWeight: '500',
-},
-itemsSection: {
+  },
+  returnStats: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+  },
+  statsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#334155',
+    marginBottom: 8,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#10B981',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  itemsSection: {
     marginTop: 8,
-},
-itemCard: {
+  },
+  itemCard: {
     backgroundColor: '#F8FAFC',
     padding: 12,
     borderRadius: 8,
@@ -446,131 +586,174 @@ itemCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-},
-itemInfo: {
+  },
+  itemCardReturned: {
+    backgroundColor: '#F0FDF4',
+    borderColor: '#10B981',
+    borderWidth: 1,
+  },
+  itemInfo: {
     flex: 1,
-},
-itemName: {
+  },
+  itemName: {
     fontSize: 14,
     color: '#334155',
     fontWeight: '500',
-    marginBottom: 2,
-},
-itemQuantity: {
+    marginBottom: 4,
+  },
+  quantityContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  itemQuantity: {
     fontSize: 12,
-    color: '#FF8C42',
+    color: '#334155',
     fontWeight: '600',
-},
-returnButton: {
+  },
+  returnedQuantity: {
+    fontSize: 12,
+    color: '#10B981',
+    fontWeight: '600',
+  },
+  remainingQuantity: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  fullyReturnedBadge: {
+    backgroundColor: '#10B981',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+    marginTop: 4,
+  },
+  fullyReturnedText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  returnButton: {
     backgroundColor: '#FF8C42',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 6,
-},
-returnButtonText: {
+  },
+  returnButtonText: {
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '600',
-},
-messageBubble: {
+  },
+  messageBubble: {
     backgroundColor: '#F8FAFC',
     padding: 12,
     borderRadius: 8,
     marginBottom: 12,
     borderLeftWidth: 3,
     borderLeftColor: '#FF8C42',
-},
-messageHeader: {
+  },
+  messageHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 8,
-},
-senderText: {
+  },
+  senderText: {
     fontSize: 12,
     color: '#64748B',
     fontWeight: '600',
-},
-timestampText: {
+  },
+  timestampText: {
     fontSize: 12,
     color: '#94A3B8',
-},
-messageText: {
+  },
+  messageText: {
     fontSize: 14,
     color: '#334155',
     lineHeight: 20,
     marginBottom: 8,
-},
-messageTypeBadge: {
+  },
+  messageTypeBadge: {
     alignSelf: 'flex-start',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,
-},
-messageTypeText: {
+  },
+  messageTypeText: {
     fontSize: 10,
     color: '#334155',
     fontWeight: '600',
-},
-actionContainer: {
+  },
+  actionContainer: {
     padding: 16,
     paddingBottom: 32,
-},
-secondaryButton: {
+  },
+  secondaryButton: {
     backgroundColor: '#FFFFFF',
     paddingVertical: 14,
     borderRadius: 8,
     alignItems: 'center',
     borderWidth: 2,
     borderColor: '#334155',
-},
-secondaryButtonText: {
+  },
+  secondaryButtonText: {
     color: '#334155',
     fontSize: 16,
     fontWeight: '600',
-},
-modalOverlay: {
+  },
+  modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-},
-modalContent: {
+  },
+  modalContent: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 24,
     width: '90%',
     maxWidth: 400,
-},
-modalTitle: {
+  },
+  modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#334155',
     marginBottom: 16,
     textAlign: 'center',
-},
-modalItemInfo: {
+  },
+  modalItemInfo: {
     backgroundColor: '#F8FAFC',
     padding: 12,
     borderRadius: 8,
     marginBottom: 16,
-},
-modalItemName: {
+  },
+  modalItemName: {
     fontSize: 16,
     fontWeight: '600',
     color: '#334155',
-    marginBottom: 4,
-},
-modalItemQuantity: {
+    marginBottom: 8,
+  },
+  modalItemQuantity: {
     fontSize: 14,
     color: '#64748B',
-},
-inputLabel: {
+    marginBottom: 2,
+  },
+  modalItemReturned: {
+    fontSize: 14,
+    color: '#10B981',
+    marginBottom: 2,
+  },
+  modalItemRemaining: {
+    fontSize: 14,
+    color: '#FF8C42',
+    fontWeight: '600',
+  },
+  inputLabel: {
     fontSize: 14,
     fontWeight: '600',
     color: '#334155',
     marginBottom: 8,
-},
-quantityInput: {
+  },
+  quantityInput: {
     borderWidth: 1,
     borderColor: '#94A3B8',
     borderRadius: 8,
@@ -578,8 +761,8 @@ quantityInput: {
     paddingVertical: 10,
     fontSize: 16,
     marginBottom: 16,
-},
-fullReturnButton: {
+  },
+  fullReturnButton: {
     backgroundColor: '#F8FAFC',
     paddingVertical: 12,
     borderRadius: 8,
@@ -587,39 +770,39 @@ fullReturnButton: {
     marginBottom: 24,
     borderWidth: 1,
     borderColor: '#FF8C42',
-},
-fullReturnButtonText: {
+  },
+  fullReturnButtonText: {
     color: '#FF8C42',
     fontSize: 14,
     fontWeight: '600',
-},
-modalActions: {
+  },
+  modalActions: {
     flexDirection: 'row',
     gap: 12,
-},
-modalCancelButton: {
+  },
+  modalCancelButton: {
     flex: 1,
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#94A3B8',
-},
-modalCancelText: {
+  },
+  modalCancelText: {
     color: '#64748B',
     fontSize: 16,
     fontWeight: '600',
-},
-modalConfirmButton: {
+  },
+  modalConfirmButton: {
     flex: 1,
     backgroundColor: '#FF8C42',
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
-},
-modalConfirmText: {
+  },
+  modalConfirmText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
-},
+  },
 });

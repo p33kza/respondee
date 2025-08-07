@@ -13,7 +13,11 @@ import {
   fetchInventoryItemAPI,
   updateInventoryItemAPI,
   deleteInventoryItemAPI,
-  cancelRequest
+  cancelRequest,
+  borrowItemsAPI,
+  returnItemsMobileAPI,
+  confirmReturnAPI,
+  cancelRequestAdminAPI
 } from '../apis/inventoryAPI';
 
 export const useCheckAvailability = (items) =>
@@ -102,6 +106,53 @@ export const useCancelRequest = () => {
   return useMutation({
     mutationFn: cancelRequest,
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['requests'] });
+    }
+  });
+};
+
+export const useBorrowItems = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: borrowItemsAPI,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['requests'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+    }
+  });
+};
+
+export const useReturnItemsMobile = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: returnItemsMobileAPI,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['requests'] });
+    }
+  });
+};
+
+export const useConfirmReturn = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: confirmReturnAPI,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['requests'] });
+    }
+  });
+};
+
+export const useCancelRequestAdmin = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: cancelRequestAdminAPI,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
       queryClient.invalidateQueries({ queryKey: ['requests'] });
     }
   });

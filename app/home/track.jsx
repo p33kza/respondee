@@ -159,9 +159,9 @@ export default function TrackScreen() {
       style={styles.requestCard} 
       activeOpacity={0.7}
       onPress={() => {
-        if (request.type === 'logistics') {
+        if (request?.type === 'logistics') {
           navigation.navigate('logisticsView', { requestId: request.id });
-        } else if (request.type === 'complaints') {
+        } else if (request?.type === 'complaints') {
           navigation.navigate('complaintsView', { requestId: request.id });
         }
         updateRequest(request?.id, { isNew: false, isRead: false });

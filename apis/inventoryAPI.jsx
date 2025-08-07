@@ -93,3 +93,46 @@ export const cancelRequest = async (requestId) => {
     throw error;
   }
 };
+
+// NEW API FUNCTIONS FOR PATCH ROUTES
+export const borrowItemsAPI = async ({ requestId, userId, items }) => {
+  const res = await fetch(`${INVENTORY_API_URL}/inventory/${requestId}/borrow`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, items })
+  });
+
+  if (!res.ok) throw new Error('Failed to borrow items');
+  return res.json();
+};
+
+export const returnItemsMobileAPI = async ({ requestId, returnItems }) => {
+  const res = await fetch(`${INVENTORY_API_URL}/inventory/${requestId}/return`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ returnItems })
+  });
+
+  if (!res.ok) throw new Error('Failed to return items');
+  return res.json();
+};
+
+export const confirmReturnAPI = async (requestId) => {
+  const res = await fetch(`${INVENTORY_API_URL}/inventory/${requestId}/return/confirm`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' }
+  });
+
+  if (!res.ok) throw new Error('Failed to confirm return');
+  return res.json();
+};
+
+export const cancelRequestAdminAPI = async (requestId) => {
+  const res = await fetch(`${INVENTORY_API_URL}/inventory/${requestId}/cancel`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' }
+  });
+
+  if (!res.ok) throw new Error('Failed to cancel request');
+  return res.json();
+};

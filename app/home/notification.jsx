@@ -3,7 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
+  ScrollView,
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
@@ -21,8 +21,11 @@ import {
 import { useStoredUser } from '../../hooks/useStoredUser';
 import { formatDateCustom } from '../../helper/Formatter';
 import { useRequests } from '../../hooks/useRequests';
+import { useNavigation } from '@react-navigation/native';
 
-export default function AccountScreen({ navigation }) {
+export default function AccountScreen() {
+
+  const navigation = useNavigation();
   const [refreshing, setRefreshing] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -36,6 +39,7 @@ export default function AccountScreen({ navigation }) {
     refetch 
   } = useUserNotifications(user?.id);
   
+  const { mutate: updateRequest } = useRequests().usePartialUpdateRequest();
   const { data: request } = useGetRequest(notifications?.requestId);
   
   const { mutate: markAsRead } = useMarkAsRead();
@@ -65,33 +69,6 @@ export default function AccountScreen({ navigation }) {
       default:
         break;
     }
-
-    const getTimestamp = (dateValue) => {
-      if (!dateValue) return 0;
-      
-      if (typeof dateValue === 'object' && dateValue.toDate) {
-        return dateValue.toDate().getTime();
-      }
-      
-      if (dateValue instanceof Date) {
-        return dateValue.getTime();
-      }
-      
-      if (typeof dateValue === 'string') {
-        try {
-          const normalized = dateValue
-            .replace(/\u202F/g, ' ')
-            .replace(/ /g, ' ')
-            .replace(' at ', ' ');
-          return new Date(normalized).getTime();
-        } catch (e) {
-          console.warn('Failed to parse date string:', dateValue);
-          return 0;
-        }
-      }
-      
-      return 0;
-    };
 
     return filtered.sort((a, b) => {
       const aTime = formatDateCustom(a.createdAt, 'relative');
@@ -165,11 +142,13 @@ export default function AccountScreen({ navigation }) {
       markAsRead(notification.id);
     }
     
-    if(request?.type === 'logistics'){
+    if(notification?.requestType === 'logistics' && request?.id){
       navigation.navigate('logisticsView', { requestId: notification.requestId });
-    } else {
+    }
+    if(notification?.requestType === 'complaints' && request?.id){
       navigation.navigate('complaintsView', { requestId: notification.requestId });
     }
+    updateRequest(request?.id, {isRead: true, isNew: false})
   };
 
   const handleMarkAllAsRead = () => {
@@ -225,13 +204,16 @@ export default function AccountScreen({ navigation }) {
     );
   };
 
-  const renderNotificationItem = ({ item: notification }) => (
+  const renderNotificationItem = (notification) => (
     <TouchableOpacity
+      key={notification.id?.toString() || Math.random().toString()}
       style={[
         styles.notificationItem,
         !notification.isRead && styles.unreadNotification
       ]}
-      onPress={() => handleNotificationPress(notification)}
+      onPress={() => {
+        handleNotificationPress(notification)
+      }}
       activeOpacity={0.7}
     >
       <View style={styles.notificationContent}>
@@ -316,6 +298,36 @@ export default function AccountScreen({ navigation }) {
     );
   }
 
+  const renderEmptyState = () => (
+    <View style={styles.emptyState}>
+      <MaterialIcons 
+        name={
+          searchQuery || selectedFilter !== 'all' 
+            ? "search-off" 
+            : selectedFilter === 'unread' 
+              ? "notifications-off" 
+              : "notifications"
+        } 
+        size={64} 
+        color="#C7C7CC" 
+      />
+      <Text style={styles.emptyTitle}>
+        {searchQuery || selectedFilter !== 'all'
+          ? "No Matching Notifications"
+          : selectedFilter === 'unread'
+            ? "No Unread Notifications"
+            : "No Notifications"}
+      </Text>
+      <Text style={styles.emptyText}>
+        {searchQuery || selectedFilter !== 'all'
+          ? "Try adjusting your search or filters"
+          : selectedFilter === 'unread'
+            ? "All caught up! No new notifications."
+            : "You don't have any notifications yet."}
+      </Text>
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -371,46 +383,20 @@ export default function AccountScreen({ navigation }) {
         />
       </View>
 
-      <FlatList
-        data={filteredNotifications}
-        renderItem={renderNotificationItem}
-        keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
+      <ScrollView
         style={styles.notificationsList}
         contentContainerStyle={styles.notificationsContent}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
-        ListEmptyComponent={() => (
-          <View style={styles.emptyState}>
-            <MaterialIcons 
-              name={
-                searchQuery || selectedFilter !== 'all' 
-                  ? "search-off" 
-                  : selectedFilter === 'unread' 
-                    ? "notifications-off" 
-                    : "notifications"
-              } 
-              size={64} 
-              color="#C7C7CC" 
-            />
-            <Text style={styles.emptyTitle}>
-              {searchQuery || selectedFilter !== 'all'
-                ? "No Matching Notifications"
-                : selectedFilter === 'unread'
-                  ? "No Unread Notifications"
-                  : "No Notifications"}
-            </Text>
-            <Text style={styles.emptyText}>
-              {searchQuery || selectedFilter !== 'all'
-                ? "Try adjusting your search or filters"
-                : selectedFilter === 'unread'
-                  ? "All caught up! No new notifications."
-                  : "You don't have any notifications yet."}
-            </Text>
-          </View>
-        )}
         showsVerticalScrollIndicator={false}
-      />
+      >
+        {filteredNotifications.length > 0 ? (
+          filteredNotifications.map(renderNotificationItem)
+        ) : (
+          renderEmptyState()
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -548,6 +534,7 @@ const styles = StyleSheet.create({
   notificationsContent: {
     paddingHorizontal: 16,
     paddingTop: 8,
+    paddingBottom: 20, // Added paddingBottom for better scrolling
   },
   notificationItem: {
     backgroundColor: '#FFFFFF',

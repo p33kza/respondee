@@ -8,12 +8,10 @@ import {
   RefreshControl,
   ActivityIndicator,
   Alert,
-  TextInput,
-  Dimensions
+  TextInput
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import { useNavigation } from '@react-navigation/native';
 import { 
   useUserNotifications,
   useMarkAsRead,
@@ -24,10 +22,7 @@ import { useStoredUser } from '../../hooks/useStoredUser';
 import { formatDateCustom } from '../../helper/Formatter';
 import { useRequests } from '../../hooks/useRequests';
 
-const { width } = Dimensions.get('window');
-
-export default function NotificationsScreen() {
-  const navigation = useNavigation();
+export default function AccountScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -43,18 +38,15 @@ export default function NotificationsScreen() {
   
   const { data: request } = useGetRequest(notifications?.requestId);
   
-  // Notification mutation hooks
   const { mutate: markAsRead } = useMarkAsRead();
   const { mutate: markAllAsRead } = useMarkAllAsRead();
   const { mutate: clearAllRead } = useClearAllRead();
 
-  // Process and sort notifications
-  const { newNotifications, otherNotifications } = useMemo(() => {
-    if (!notifications) return { newNotifications: [], otherNotifications: [] };
+  const filteredNotifications = useMemo(() => {
+    if (!notifications) return [];
 
     let filtered = [...notifications];
 
-    // Apply search filter
     if (searchQuery.trim()) {
       filtered = filtered.filter(notification =>
         notification.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -63,7 +55,6 @@ export default function NotificationsScreen() {
       );
     }
 
-    // Apply read/unread filter
     switch (selectedFilter) {
       case 'unread':
         filtered = filtered.filter(notification => !notification.isRead);
@@ -75,24 +66,42 @@ export default function NotificationsScreen() {
         break;
     }
 
-    // Sort function for newest first
-    const sortByDate = (a, b) => {
-      const dateA = new Date(a.createdAt || a.timestamp);
-      const dateB = new Date(b.createdAt || b.timestamp);
-      return dateB - dateA;
+    const getTimestamp = (dateValue) => {
+      if (!dateValue) return 0;
+      
+      if (typeof dateValue === 'object' && dateValue.toDate) {
+        return dateValue.toDate().getTime();
+      }
+      
+      if (dateValue instanceof Date) {
+        return dateValue.getTime();
+      }
+      
+      if (typeof dateValue === 'string') {
+        try {
+          const normalized = dateValue
+            .replace(/\u202F/g, ' ')
+            .replace(/ /g, ' ')
+            .replace(' at ', ' ');
+          return new Date(normalized).getTime();
+        } catch (e) {
+          console.warn('Failed to parse date string:', dateValue);
+          return 0;
+        }
+      }
+      
+      return 0;
     };
 
-    // Separate and sort new notifications
-    const newNotifs = filtered.filter(n => n.isNew).sort(sortByDate);
-    
-    // Separate and sort other notifications
-    const otherNotifs = filtered.filter(n => !n.isNew).sort(sortByDate);
-
-    return { newNotifications: newNotifs, otherNotifications: otherNotifs };
+    return filtered.sort((a, b) => {
+      const aTime = formatDateCustom(a.createdAt, 'relative');
+      const bTime = formatDateCustom(b.createdAt, 'relative');
+      
+      return bTime - aTime;
+    });
   }, [notifications, searchQuery, selectedFilter]);
 
   const unreadCount = notifications?.filter(n => !n.isRead).length || 0;
-  const readCount = notifications?.filter(n => n.isRead).length || 0;
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -156,8 +165,10 @@ export default function NotificationsScreen() {
       markAsRead(notification.id);
     }
     
-    if (notification.requestId) {
+    if(request?.type === 'logistics'){
       navigation.navigate('logisticsView', { requestId: notification.requestId });
+    } else {
+      navigation.navigate('complaintsView', { requestId: notification.requestId });
     }
   };
 
@@ -188,6 +199,7 @@ export default function NotificationsScreen() {
   };
 
   const handleClearAllRead = () => {
+    const readCount = notifications?.filter(n => n.isRead).length || 0;
     if (readCount === 0) return;
     
     Alert.alert(
@@ -213,22 +225,22 @@ export default function NotificationsScreen() {
     );
   };
 
-  const renderNotificationItem = ({ item }) => (
+  const renderNotificationItem = ({ item: notification }) => (
     <TouchableOpacity
       style={[
         styles.notificationItem,
-        !item.isRead && styles.unreadNotification
+        !notification.isRead && styles.unreadNotification
       ]}
-      onPress={() => handleNotificationPress(item)}
+      onPress={() => handleNotificationPress(notification)}
       activeOpacity={0.7}
     >
       <View style={styles.notificationContent}>
         <View style={styles.notificationHeader}>
           <View style={styles.iconContainer}>
             <MaterialIcons
-              name={getNotificationIcon(item.type)}
+              name={getNotificationIcon(notification.type)}
               size={24}
-              color={getNotificationColor(item.type)}
+              color={getNotificationColor(notification.type)}
             />
           </View>
           
@@ -236,20 +248,20 @@ export default function NotificationsScreen() {
             <View style={styles.titleRow}>
               <Text style={[
                 styles.notificationTitle,
-                !item.isRead && styles.unreadTitle
+                !notification.isRead && styles.unreadTitle
               ]} numberOfLines={1}>
-                {item.title || 'Notification'}
+                {notification.title || 'Notification'}
               </Text>
-              {!item.isRead && <View style={styles.unreadDot} />}
+              {!notification.isRead && <View style={styles.unreadDot} />}
             </View>
             
             <Text style={styles.notificationMessage} numberOfLines={2}>
-              {item.description || 'No message content'}
+              {notification.description || 'No message content'}
             </Text>
             
             <View style={styles.notificationMeta}>
               <Text style={styles.notificationTime}>
-                {formatDateCustom(item.createdAt || item.timestamp, 'relative')}
+                {formatDateCustom(notification.createdAt, 'relative')}
               </Text>
             </View>
           </View>
@@ -257,40 +269,6 @@ export default function NotificationsScreen() {
       </View>
     </TouchableOpacity>
   );
-
-  const renderSectionHeader = (title) => (
-    <View style={styles.sectionHeader}>
-      <Text style={styles.sectionHeaderText}>{title}</Text>
-    </View>
-  );
-
-  const renderNotifications = () => {
-    const sections = [];
-    
-    if (newNotifications.length > 0) {
-      sections.push(renderSectionHeader('New'));
-      newNotifications.forEach(notification => {
-        sections.push(
-          <View key={`new-${notification.id}`}>
-            {renderNotificationItem({ item: notification })}
-          </View>
-        );
-      });
-    }
-    
-    if (otherNotifications.length > 0) {
-      sections.push(renderSectionHeader('Earlier'));
-      otherNotifications.forEach(notification => {
-        sections.push(
-          <View key={`other-${notification.id}`}>
-            {renderNotificationItem({ item: notification })}
-          </View>
-        );
-      });
-    }
-
-    return sections;
-  };
 
   const FilterButton = ({ filter, title, icon, count }) => (
     <TouchableOpacity
@@ -329,7 +307,7 @@ export default function NotificationsScreen() {
 
   if (isLoading && !notifications) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={styles.container}>
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color="#FF9500" />
           <Text style={styles.loadingText}>Loading notifications...</Text>
@@ -339,25 +317,23 @@ export default function NotificationsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Notifications</Text>
         <View style={styles.headerActions}>
           {unreadCount > 0 && (
             <TouchableOpacity onPress={handleMarkAllAsRead} style={styles.markAllButton}>
-              <Text style={styles.markAllText}>Mark All Read</Text>
+              <Text style={styles.markAllText}>Mark All as Read</Text>
             </TouchableOpacity>
           )}
-          {readCount > 0 && (
+          {(notifications?.length - unreadCount) > 0 && (
             <TouchableOpacity onPress={handleClearAllRead} style={styles.clearAllButton}>
-              <Text style={styles.clearAllText}>Clear Read</Text>
+              <Text style={styles.clearAllText}>Clear All Read</Text>
             </TouchableOpacity>
           )}
         </View>
       </View>
 
-      {/* Search */}
       <View style={styles.searchContainer}>
         <MaterialIcons name="search" size={20} color="#8E8E93" style={styles.searchIcon} />
         <TextInput
@@ -366,8 +342,6 @@ export default function NotificationsScreen() {
           value={searchQuery}
           onChangeText={setSearchQuery}
           placeholderTextColor="#8E8E93"
-          returnKeyType="search"
-          blurOnSubmit={true}
         />
         {searchQuery.length > 0 && (
           <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearButton}>
@@ -376,7 +350,6 @@ export default function NotificationsScreen() {
         )}
       </View>
 
-      {/* Filters */}
       <View style={styles.filterContainer}>
         <FilterButton 
           filter="all" 
@@ -394,55 +367,49 @@ export default function NotificationsScreen() {
           filter="read" 
           title="Read" 
           icon="drafts" 
-          count={readCount} 
+          count={(notifications?.length || 0) - unreadCount} 
         />
       </View>
 
-      {/* Notifications List */}
       <FlatList
-        data={[]}
-        keyExtractor={(item) => item.id}
-        renderItem={null}
-        ListHeaderComponent={
-          <>
-            {renderNotifications()}
-            {newNotifications.length === 0 && otherNotifications.length === 0 && (
-              <View style={[styles.emptyState, { flex: 1 }]}>
-                <MaterialIcons 
-                  name={
-                    searchQuery || selectedFilter !== 'all' 
-                      ? "search-off" 
-                      : selectedFilter === 'unread' 
-                        ? "notifications-off" 
-                        : "notifications"
-                  } 
-                  size={64} 
-                  color="#C7C7CC" 
-                />
-                <Text style={styles.emptyTitle}>
-                  {searchQuery || selectedFilter !== 'all'
-                    ? "No Matching Notifications"
-                    : selectedFilter === 'unread'
-                      ? "No Unread Notifications"
-                      : "No Notifications"}
-                </Text>
-                <Text style={styles.emptyText}>
-                  {searchQuery || selectedFilter !== 'all'
-                    ? "Try adjusting your search or filters"
-                    : selectedFilter === 'unread'
-                      ? "All caught up! No new notifications."
-                      : "You don't have any notifications yet."}
-                </Text>
-              </View>
-            )}
-          </>
-        }
+        data={filteredNotifications}
+        renderItem={renderNotificationItem}
+        keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
         style={styles.notificationsList}
-        contentContainerStyle={[styles.notificationsContent, { paddingBottom: 40 }]}
+        contentContainerStyle={styles.notificationsContent}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
-        showsVerticalScrollIndicator={true}
+        ListEmptyComponent={() => (
+          <View style={styles.emptyState}>
+            <MaterialIcons 
+              name={
+                searchQuery || selectedFilter !== 'all' 
+                  ? "search-off" 
+                  : selectedFilter === 'unread' 
+                    ? "notifications-off" 
+                    : "notifications"
+              } 
+              size={64} 
+              color="#C7C7CC" 
+            />
+            <Text style={styles.emptyTitle}>
+              {searchQuery || selectedFilter !== 'all'
+                ? "No Matching Notifications"
+                : selectedFilter === 'unread'
+                  ? "No Unread Notifications"
+                  : "No Notifications"}
+            </Text>
+            <Text style={styles.emptyText}>
+              {searchQuery || selectedFilter !== 'all'
+                ? "Try adjusting your search or filters"
+                : selectedFilter === 'unread'
+                  ? "All caught up! No new notifications."
+                  : "You don't have any notifications yet."}
+            </Text>
+          </View>
+        )}
+        showsVerticalScrollIndicator={false}
       />
     </SafeAreaView>
   );
@@ -470,43 +437,35 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    minHeight: 60,
   },
   headerActions: {
     flexDirection: 'column',
-    alignItems: 'flex-end',
-    gap: 6,
-    maxWidth: width * 0.4,
+    gap: 8,
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: 'bold',
     color: '#000000',
-    flex: 1,
   },
   markAllButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 6,
     backgroundColor: '#FF9500',
-    minWidth: 80,
-    alignItems: 'center',
   },
   markAllText: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#FFFFFF',
     fontWeight: '500',
   },
   clearAllButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 6,
     backgroundColor: '#E5E5EA',
-    minWidth: 80,
-    alignItems: 'center',
   },
   clearAllText: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#000000',
     fontWeight: '500',
   },
@@ -585,17 +544,16 @@ const styles = StyleSheet.create({
   },
   notificationsList: {
     flex: 1,
-    width: '100%',
   },
   notificationsContent: {
-    paddingBottom: 40,
+    paddingHorizontal: 16,
+    paddingTop: 8,
   },
   notificationItem: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
     marginBottom: 8,
-    marginHorizontal: 16,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -604,7 +562,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
-    minHeight: 90,
   },
   unreadNotification: {
     borderLeftWidth: 3,
@@ -656,23 +613,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  notificationType: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#FF9500',
+    letterSpacing: 0.5,
+  },
   notificationTime: {
     fontSize: 12,
     color: '#8E8E93',
-  },
-  sectionHeader: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#f8f8f8',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    marginTop: 8,
-  },
-  sectionHeaderText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
-    textTransform: 'uppercase',
   },
   emptyState: {
     alignItems: 'center',

@@ -311,7 +311,7 @@ export default function LogisticsScreen() {
             <Text style={styles.sectionLabel}>Items Needed <Text style={styles.required}>*</Text></Text>
             <View style={styles.itemsContainer}>
               {items.map((item, index) => (
-                <View key={index} style={styles.itemCard}>
+                <View key={`item-${index}`} style={styles.itemCard}>
                   <View style={styles.itemRow}>
                     <TouchableOpacity 
                       style={[styles.itemInput, styles.itemNameInput, styles.itemSelector]}
@@ -552,7 +552,7 @@ export default function LogisticsScreen() {
               <ScrollView style={styles.modalList}>
                 {requestCategories.map((category, index) => (
                   <TouchableOpacity
-                    key={index}
+                    key={`category-${index}-${category.type}`}
                     style={[
                       styles.modalItem,
                       selectedType === category.type && styles.modalItemSelected
@@ -599,9 +599,9 @@ export default function LogisticsScreen() {
                 </TouchableOpacity>
               </View>
               <ScrollView style={styles.modalList}>
-                {inventory?.map((inventoryItem) => (
+                {inventory?.map((inventoryItem, index) => (
                   <TouchableOpacity
-                    key={inventoryItem.item}
+                    key={inventoryItem.id ? `inventory-${inventoryItem.id}` : `inventory-${index}-${inventoryItem.item || 'unknown'}`}
                     style={styles.inventoryItem}
                     onPress={() => handleInventoryItemSelect(inventoryItem)}
                     activeOpacity={0.7}

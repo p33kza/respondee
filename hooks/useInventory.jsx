@@ -39,7 +39,7 @@ export const useReturnItems = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: returnItemsAPI,
+    mutationFn: ({requestId, returns}) => returnItemsAPI({requestId, returns}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
       queryClient.invalidateQueries({ queryKey: ['requests'] });

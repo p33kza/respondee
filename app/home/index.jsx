@@ -93,12 +93,6 @@ export default function HomeScreen() {
           <Text style={styles.requestTitle} numberOfLines={1}>
             {item.title}
           </Text>
-          {item.isStarred && (
-            <Ionicons name="star" size={16} color="#FFD700" style={styles.starIcon} />
-          )}
-          {!item.isRead && (
-            <View style={styles.unreadBadge} />
-          )}
         </View>
         <Text style={styles.requestDate}>{formatDate(item.date)}</Text>
       </View>

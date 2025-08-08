@@ -9,7 +9,7 @@ export default function SuccessScreen() {
       {/* Checkmark Image */}
       <Image
         source={{
-          uri: 'https://img.icons8.com/fluency-systems-filled/96/2DC4A4/checkmark.png', // ✅ replace with your asset if needed
+          uri: 'https://img.icons8.com/fluency-systems-filled/96/2DC4A4/checkmark.png',
         }}
         style={styles.checkIcon}
       />

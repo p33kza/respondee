@@ -17,6 +17,8 @@ import {
   ScrollView,
   TouchableWithoutFeedback,
   Keyboard,
+  BackHandler,
+  ToastAndroid,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useUsers } from '../../hooks/useUsers';
@@ -32,6 +34,7 @@ export default function LoginScreen() {
   const [userId, setUserId] = useState('');
   const [loading, setLoading] = useState(false);
   const [emailFocused, setEmailFocused] = useState(false);
+  const [backPressCount, setBackPressCount] = useState(0);
   const { data: users, isLoading } = useUsers();
 
   useEffect(() => {
@@ -40,6 +43,33 @@ export default function LoginScreen() {
       setUserId(foundUser?.id || '');
     }
   }, [email, users]);
+
+  useEffect(() => {
+    const backAction = () => {
+      if (backPressCount === 0) {
+        setBackPressCount(1);
+        
+        if (Platform.OS === 'android') {
+          ToastAndroid.show('Press back again to exit', ToastAndroid.SHORT);
+        } else {
+          Alert.alert('Exit App', 'Press back again to exit the app');
+        }
+        
+        setTimeout(() => {
+          setBackPressCount(0);
+        }, 2000);
+        
+        return true; 
+      } else {
+        BackHandler.exitApp();
+        return false;
+      }
+    };
+
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+
+    return () => backHandler.remove();
+  }, [backPressCount]);
 
   const handleLogin = async () => {
     if (!email) {

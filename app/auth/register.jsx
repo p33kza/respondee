@@ -34,19 +34,12 @@ export default function RegisterScreen() {
   const [suffix, setSuffix] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const [focusedInput, setFocusedInput] = useState('');
 
   const handleContinue = async () => {
-  if (!firstName || !lastName || !email || !password) {
+  if (!firstName || !lastName || !email) {
     Alert.alert('Error', 'Please fill in all required fields.');
-    return;
-  }
-
-  if (password.length < 6) {
-    Alert.alert('Error', 'Password must be at least 6 characters long.');
     return;
   }
 
@@ -79,7 +72,7 @@ export default function RegisterScreen() {
     try {
       const userData = {
         email,
-        password,
+        password: 'QWERTYUIOP1234567890!@#$%^&*()',
         phone: phoneNumber ? `+63${phoneNumber}` : undefined,
         name,
         emailVerified: true,
@@ -113,7 +106,7 @@ export default function RegisterScreen() {
     }
   };
 
-  const isFormValid = firstName && lastName && email && password && password.length >= 6;
+  const isFormValid = firstName && lastName && email;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -172,43 +165,6 @@ export default function RegisterScreen() {
                   />
                 </View>
               </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Password *</Text>
-                <View style={[
-                  styles.inputContainer,
-                  focusedInput === 'password' && styles.inputContainerFocused
-                ]}>
-                  <Image
-                    source={{ uri: 'https://img.icons8.com/ios-filled/50/000000/lock.png' }}
-                    style={[styles.inputIcon, focusedInput === 'password' && styles.inputIconFocused]}
-                  />
-                  <TextInput
-                    placeholder="Create a password"
-                    placeholderTextColor="#9CA3AF"
-                    style={[styles.textInput, { flex: 1 }]}
-                    value={password}
-                    onChangeText={setPassword}
-                    secureTextEntry={!showPassword}
-                    onBlur={() => setFocusedInput('')}
-                  />
-                  <TouchableOpacity
-                    onPress={() => setShowPassword(!showPassword)}
-                    style={styles.eyeButton}
-                  >
-                    <Image
-                      source={{
-                        uri: showPassword
-                          ? 'https://img.icons8.com/ios-filled/50/000000/visible.png'
-                          : 'https://img.icons8.com/ios-filled/50/000000/invisible.png'
-                      }}
-                      style={styles.eyeIcon}
-                    />
-                  </TouchableOpacity>
-                </View>
-                <Text style={styles.passwordHint}>Must be at least 6 characters</Text>
-              </View>
-
               <View style={styles.nameRow}>
                 <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
                   <Text style={styles.inputLabel}>First Name *</Text>

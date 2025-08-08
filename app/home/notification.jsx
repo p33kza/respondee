@@ -19,7 +19,7 @@ import {
   useClearAllRead
 } from '../../hooks/useNotifications';
 import { useStoredUser } from '../../hooks/useStoredUser';
-import { formatDateCustom } from '../../helper/Formatter';
+import { formatDateCustom, getTimestampFromFirebaseDate } from '../../helper/Formatter';
 import { useRequests } from '../../hooks/useRequests';
 import { useNavigation } from '@react-navigation/native';
 
@@ -71,8 +71,8 @@ export default function AccountScreen() {
     }
 
     return filtered.sort((a, b) => {
-      const aTime = formatDateCustom(a.createdAt, 'relative');
-      const bTime = formatDateCustom(b.createdAt, 'relative');
+      const aTime = getTimestampFromFirebaseDate(a.createdAt);
+      const bTime = getTimestampFromFirebaseDate(b.createdAt);
       
       return bTime - aTime;
     });
@@ -138,18 +138,22 @@ export default function AccountScreen() {
   };
 
   const handleNotificationPress = (notification) => {
-    if (!notification.isRead) {
-      markAsRead(notification.id);
-    }
+  if (!notification.isRead) {
+    markAsRead(notification.id);
+  }
+  
+  if (notification?.requestId && notification?.requestType) {
+    const requestType = notification.requestType.toLowerCase();
     
-    if(notification?.requestType === 'logistics' && request?.id){
+    if (requestType === 'logistics') {
       navigation.navigate('logisticsView', { requestId: notification.requestId });
-    }
-    if(notification?.requestType === 'complaints' && request?.id){
+    } else if (requestType === 'complaints') {
       navigation.navigate('complaintsView', { requestId: notification.requestId });
     }
+    
     updateRequest(request?.id, {isRead: true, isNew: false})
-  };
+  }
+};
 
   const handleMarkAllAsRead = () => {
     if (unreadCount === 0) return;
@@ -385,11 +389,15 @@ export default function AccountScreen() {
 
       <ScrollView
         style={styles.notificationsList}
-        contentContainerStyle={styles.notificationsContent}
+        contentContainerStyle={[
+          styles.notificationsContent,
+          filteredNotifications.length === 0 && styles.emptyContentContainer
+        ]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         {filteredNotifications.length > 0 ? (
           filteredNotifications.map(renderNotificationItem)
@@ -534,7 +542,11 @@ const styles = StyleSheet.create({
   notificationsContent: {
     paddingHorizontal: 16,
     paddingTop: 8,
-    paddingBottom: 20, // Added paddingBottom for better scrolling
+    paddingBottom: 80, 
+  },
+  emptyContentContainer: {
+    flexGrow: 1,
+    justifyContent: 'center',
   },
   notificationItem: {
     backgroundColor: '#FFFFFF',
@@ -613,7 +625,7 @@ const styles = StyleSheet.create({
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 150,
+    paddingVertical: 100, 
   },
   emptyTitle: {
     fontSize: 20,

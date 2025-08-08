@@ -169,3 +169,25 @@ export const formatDate = (dateInput) => {
         });
     }
 };
+
+export const getTimestampFromFirebaseDate = (firebaseDate) => {
+    if (!firebaseDate) return 0;
+    
+    if (firebaseDate instanceof Date) {
+      return firebaseDate.getTime();
+    }
+    
+    if (firebaseDate._seconds !== undefined) {
+      return new Date(firebaseDate._seconds * 1000).getTime();
+    }
+    
+    if (firebaseDate.seconds) {
+      return new Date(firebaseDate.seconds * 1000).getTime();
+    }
+    
+    if (typeof firebaseDate === 'string') {
+      return new Date(firebaseDate).getTime();
+    }
+    
+    return new Date(firebaseDate).getTime();
+  };

@@ -67,7 +67,6 @@ export default function LogisticsDetailView() {
     });
   };
 
-  // Helper function to calculate returned quantity for a specific item
   const getReturnedQuantity = (itemName) => {
     const returnedItems = request?.logisticsObj?.returnedItems || [];
     return returnedItems
@@ -75,13 +74,11 @@ export default function LogisticsDetailView() {
       .reduce((sum, item) => Number(sum) + Number(item.quantity || 0), 0);
   };
 
-  // Helper function to calculate remaining quantity for a specific item
   const getRemainingQuantity = (borrowedItem) => {
     const returnedQty = getReturnedQuantity(borrowedItem.item);
     return Number(borrowedItem.quantity || 0) - Number(returnedQty);
   };
 
-  // Helper function to get items with calculated quantities
   const getItemsWithQuantities = () => {
     const borrowedItems = request?.logisticsObj?.items || [];
     return borrowedItems.map(item => ({
@@ -162,7 +159,6 @@ export default function LogisticsDetailView() {
         });
       },
       onError: (err) => {
-        // Rollback optimistic update
         updateRequest(requestId, previousRequest);
         console.error('Return error:', err);
         Alert.alert('Error', err.message || 'Failed to return item');
@@ -254,7 +250,6 @@ export default function LogisticsDetailView() {
     </View>
   );
 
-  // Calculate overall return statistics
   const itemsWithQuantities = getItemsWithQuantities();
   const totalItems = itemsWithQuantities.length;
   const fullyReturnedItems = itemsWithQuantities.filter(item => item.remainingQuantity <= 0).length;

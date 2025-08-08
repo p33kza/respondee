@@ -29,8 +29,7 @@ export default function WelcomeBackScreen() {
     if (allFilled) {
       Keyboard.dismiss();
 
-      // 🔐 Simulated verification check (Replace with real logic later)
-      const isVerified = false; // change this to false to test unverified route
+      const isVerified = false; 
 
       setTimeout(() => {
         router.replace(isVerified ? '/verified' : '/home');
@@ -99,7 +98,6 @@ export default function WelcomeBackScreen() {
           resizeMode="contain"
         />
 
-        {/* Help Center / Forgot MPIN */}
         <View style={styles.footerLinks}>
           <TouchableOpacity>
             <Text style={styles.footerLinkText}>Help Center</Text>

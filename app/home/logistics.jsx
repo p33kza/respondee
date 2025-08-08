@@ -191,7 +191,7 @@ export default function LogisticsScreen() {
         title: finalTitle,
         description,
         status: 'pending',
-        priority: isEmergency ? 'high' : 'medium', // Changed to match your dataset
+        priority: isEmergency ? 'high' : 'medium', 
         userId: user?.id,
         logisticsObj: {
           items: validItems.map(item => ({
@@ -201,14 +201,14 @@ export default function LogisticsScreen() {
           eventDate: eventDate.toISOString(),
           returnDate: returnDate.toISOString(),
           location: requestLocation,
-          isReturned: false // Added to match your dataset
+          isReturned: false 
         },
         date: new Date().toISOString(),
         isStarred: false,
         isSpam: false,
         isRead: false,
         isNew: true,
-        labelAs: 'none' // Simplified to match your dataset
+        labelAs: 'none' 
       };
 
       submitRequest(requestData, {

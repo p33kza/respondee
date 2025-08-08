@@ -94,7 +94,6 @@ export const cancelRequest = async (requestId) => {
   }
 };
 
-// NEW API FUNCTIONS FOR PATCH ROUTES
 export const borrowItemsAPI = async ({ requestId, userId, items }) => {
   const res = await fetch(`${INVENTORY_API_URL}/inventory/${requestId}/borrow`, {
     method: 'PATCH',

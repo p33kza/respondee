@@ -582,7 +582,6 @@ export default function TutorialScreen() {
         fontWeight: '500',
     },
 
-    // Welcome Screen Styles
     welcomeContainer: {
         flex: 1,
         alignItems: 'center',
@@ -637,7 +636,6 @@ export default function TutorialScreen() {
         fontWeight: '500',
     },
 
-    // Demo Screen Styles
     demoContainer: {
         flex: 1,
         backgroundColor: '#F8F9FA',
@@ -783,7 +781,6 @@ export default function TutorialScreen() {
         borderLeftColor: '#28A745',
     },
 
-    // Floating Action Button
     floatingButton: {
         position: 'absolute',
         bottom: 30,
@@ -804,7 +801,6 @@ export default function TutorialScreen() {
         elevation: 8,
     },
 
-    // Tooltip Styles
     highlightTooltip: {
         backgroundColor: '#334155',
         paddingHorizontal: 16,
@@ -834,7 +830,6 @@ export default function TutorialScreen() {
         marginBottom: 12,
     },
 
-    // Request Type Demo Styles
     header: {
         marginBottom: 32,
         paddingTop: 10,
@@ -933,7 +928,6 @@ export default function TutorialScreen() {
         alignItems: 'center',
     },
 
-    // Track Demo Styles
     trackHeader: {
         backgroundColor: '#FFFFFF',
         paddingHorizontal: 20,

@@ -33,7 +33,7 @@ export default function VerifyStartScreen() {
       {/* Continue Button */}
       <TouchableOpacity
         style={styles.button}
-        onPress={() => router.push('/verify/verify-id')} // 👉 replace with next screen
+        onPress={() => router.push('/verify/verify-id')} 
       >
         <Text style={styles.buttonText}>Continue</Text>
       </TouchableOpacity>

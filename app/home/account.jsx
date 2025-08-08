@@ -51,9 +51,21 @@ export default function ProfileScreen() {
         {
           text: 'Logout',
           style: 'destructive',
-          onPress: () => {
-            AsyncStorage.removeItem('user');
-            router.push('/auth/login');
+          onPress: async () => {
+            try {
+              await AsyncStorage.removeItem('user');
+              await AsyncStorage.removeItem('userId');
+              await AsyncStorage.removeItem('email');
+              await AsyncStorage.removeItem('otp');
+              
+              router.replace('/auth/login');
+              if (router.canGoBack()) {
+                router.dismissAll();
+              }
+            } catch (error) {
+              console.error('Logout error:', error);
+              router.replace('/auth/login');
+            }
           }
         }
       ]
@@ -71,7 +83,6 @@ export default function ProfileScreen() {
       return;
     }
 
-    // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
       Alert.alert('Error', 'Please enter a valid email address');
@@ -558,7 +569,6 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   
-  // About Modal Styles
   aboutContainer: {
     flex: 1,
     backgroundColor: '#FFFFFF',

@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
   },
   iconAction: {
     alignItems: 'center',
-    width: '14%', // fit 4 per row with spacing
+    width: '14%',
     marginBottom: 20,
   },
     
@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
     color: '#3E4A5A',
   },
   scrollContent: {
-    paddingBottom: 150, // so last item doesn't get hidden behind verifyBanner
+    paddingBottom: 150,
   },
   
   profileRow: {
@@ -146,16 +146,16 @@ const styles = StyleSheet.create({
   },
 
   promoImage: {
-    width: 140,        // ⬅️ increased from 60
-    height: 50,       // ⬅️ increased from 60
-    borderRadius: 60,  // optional for rounded corners
+    width: 140,      
+    height: 50,      
+    borderRadius: 60, 
     resizeMode: 'contain',
   },
   
   promoImage1: {
-    width: 100,        // ⬅️ increased from 60
-    height: 80,       // ⬅️ increased from 60
-    borderRadius: 60,  // optional for rounded corners
+    width: 100,      
+    height: 80,      
+    borderRadius: 60,  
     resizeMode: 'contain',
   },
 
@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    gap: 30,               // Optional spacing between items
+    gap: 30,               
     marginBottom: 20,
   },
   

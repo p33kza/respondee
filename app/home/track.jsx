@@ -16,7 +16,7 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useRequests } from "../../hooks/useRequests";
 import { useStoredUser } from "../../hooks/useStoredUser";
 import { useNavigation } from "@react-navigation/native";
-import { formatDateCustom } from "../../helper/Formatter";
+import { formatDateCustom, getTimestampFromFirebaseDate } from "../../helper/Formatter";
 
 const { width, height } = Dimensions.get('window');
 
@@ -65,19 +65,19 @@ export default function TrackScreen() {
     }
 
     return filtered.sort((a, b) => {
-      const dateA = a.dateSubmitted || a.createdAt;
-      const dateB = b.dateSubmitted || b.createdAt;
+      const dateA = getTimestampFromFirebaseDate(a.createdAt || a.dateSubmitted);
+      const dateB = getTimestampFromFirebaseDate(b.createdAt || b.dateSubmitted);
       
       switch (sortBy) {
         case 'oldest':
-          return new Date(dateA) - new Date(dateB);
+          return dateA - dateB;
         case 'title':
           return (a.title || '').localeCompare(b.title || '');
         case 'status':
           return (a.status || '').localeCompare(b.status || '');
         case 'newest':
         default:
-          return new Date(dateB) - new Date(dateA);
+          return dateB - dateA;
       }
     });
   }, [requests, searchQuery, selectedStatus, selectedType, sortBy]);
@@ -454,7 +454,6 @@ export default function TrackScreen() {
           </View>
         )}
         
-        {/* Add extra space at the bottom */}
         <View style={{ height: 40 }} />
       </ScrollView>
 

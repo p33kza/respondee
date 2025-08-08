@@ -16,7 +16,7 @@ const { width, height } = Dimensions.get('window');
 
 export default function ReEnterMPINScreen() {
   const router = useRouter();
-  const { mpin: storedMpin } = useLocalSearchParams(); // received as a string e.g. "1234"
+  const { mpin: storedMpin } = useLocalSearchParams();
   const [mpin, setMpin] = useState(['', '', '', '']);
   const inputs = useRef([]);
 

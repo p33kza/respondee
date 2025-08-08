@@ -42,17 +42,14 @@ export default function SelectRequestTypeScreen() {
   return (
     <ScrollView 
       style={styles.container}
-      contentContainerStyle={styles.scrollContent} // Add this
+      contentContainerStyle={styles.scrollContent} 
     >
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>New Request</Text>
         <View style={styles.placeholder} />
       </View>
 
-      {/* Main Content */}
       <View style={styles.mainContent}>
-        {/* Welcome Message */}
         <View style={styles.messageContainer}>
           <View style={styles.iconContainer}>
             <Ionicons name="document-text" size={48} color="#FF8C42" />

@@ -17,7 +17,7 @@ import { useStoredUser } from '../../hooks/useStoredUser';
 
 export default function ResponseScreen() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedFilter, setSelectedFilter] = useState('all'); // all, unread
+  const [selectedFilter, setSelectedFilter] = useState('all');
   const [refreshing, setRefreshing] = useState(false);
 
   const userResult = useStoredUser();
@@ -27,16 +27,13 @@ export default function ResponseScreen() {
   const { data: userRequests, isLoading, refetch } = requestsHook.useGetRequestsByUser(user?.id);
   const { refetchByUser } = requestsHook.useRefreshRequests();
 
-  // Filter requests based on search and filter type
   const filteredRequests = React.useMemo(() => {
     if (!userRequests) return [];
 
     let filtered = userRequests.filter(request => {
-      // Only show requests that have messages
       return request.messages && request.messages.length > 0;
     });
 
-    // Apply search filter
     if (searchQuery) {
       filtered = filtered.filter(request =>
         request.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -46,7 +43,6 @@ export default function ResponseScreen() {
       );
     }
 
-    // Apply status filter
     switch (selectedFilter) {
       case 'unread':
         filtered = filtered.filter(request => !request.isRead);
@@ -54,8 +50,6 @@ export default function ResponseScreen() {
       default:
         break;
     }
-
-    // Sort by latest message timestamp
     return filtered.sort((a, b) => {
       const aLatest = a.messages?.[a.messages.length - 1]?.timestamp || a.createdAt;
       const bLatest = b.messages?.[b.messages.length - 1]?.timestamp || b.createdAt;
@@ -86,7 +80,7 @@ export default function ResponseScreen() {
         minute: '2-digit',
         hour12: true
       });
-    } else if (diffInHours < 168) { // Less than a week
+    } else if (diffInHours < 168) { 
       return date.toLocaleDateString('en-US', { weekday: 'short' });
     } else {
       return date.toLocaleDateString('en-US', {
@@ -102,7 +96,6 @@ export default function ResponseScreen() {
   };
 
   const getSenderName = (senderId) => {
-    // You might want to implement a user lookup here
     if (senderId === user?.id) return 'You';
     return `User ${senderId?.toString().slice(-4) || 'Unknown'}`;
   };
@@ -138,8 +131,6 @@ export default function ResponseScreen() {
   };
 
   const handleRequestPress = (request) => {
-    // Navigate to detailed chat view
-    // navigation.navigate('ChatDetail', { requestId: request.id });
     Alert.alert('Open Chat', `Opening chat for: ${request.title}`);
   };
 

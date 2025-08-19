@@ -1,7 +1,7 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Alert } from 'react-native';
 
 import HomeScreen from './index';
 import NotificationScreen from './notification';
@@ -16,11 +16,15 @@ import LogisticsMessageView from './MessageView';
 import ComplaintsDetailView from './complaintsView';
 import MessageView from './MessageView';
 import AboutScreen from './about';
+import { useStoredUser } from '../../hooks/useStoredUser';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
 function MainTabs() {
+  const user = useStoredUser();
+  const isAdminVerified = user?.adminVerified === true;
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -30,30 +34,95 @@ function MainTabs() {
         tabBarLabelStyle: { fontSize: 10 },
       }}
     >
-      <Tab.Screen name="Home" component={HomeScreen} options={{
-        tabBarLabel: 'Home',
-        tabBarIcon: ({ color }) => <Ionicons name="home-outline" size={22} color={color} />
-      }} />
-      <Tab.Screen name="Notification" component={NotificationScreen} options={{
-        tabBarLabel: 'Notification',
-        tabBarIcon: ({ color }) => <Ionicons name="notifications-outline" size={22} color={color} />
-      }} />
-      <Tab.Screen name="SelectRequest" component={SelectRequestTypeScreen} options={{
-        tabBarLabel: '',
-        tabBarIcon: () => (
-          <View style={styles.middleIconWrapper}>
-            <MaterialCommunityIcons name="plus" size={28} color="#fff" />
-          </View>
-        )
-      }} />
-      <Tab.Screen name="Track" component={TrackScreen} options={{
-        tabBarLabel: 'My Requests',
-        tabBarIcon: ({ color }) => <Ionicons name="document-text-outline" size={22} color={color} />
-      }} />
-      <Tab.Screen name="Account" component={AccountScreen} options={{
-        tabBarLabel: 'Account',
-        tabBarIcon: ({ color }) => <Ionicons name="person-outline" size={22} color={color} />
-      }} />
+      <Tab.Screen
+        name="Home"
+        component={HomeScreen}
+        options={{
+          tabBarLabel: 'Home',
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="home-outline" size={22} color={color} />
+          ),
+        }}
+      />
+
+      <Tab.Screen
+        name="Notification"
+        component={NotificationScreen}
+        listeners={{
+          tabPress: e => {
+            if (!isAdminVerified) {
+              e.preventDefault();
+              Alert.alert(
+                "Prewview Only",
+                "Your account is not yet verified by the admin."
+              );
+            }
+          }
+        }}
+        options={{
+          tabBarLabel: 'Notification',
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="notifications-outline" size={22} color={color} />
+          ),
+        }}
+      />
+
+      <Tab.Screen
+        name="SelectRequest"
+        component={SelectRequestTypeScreen}
+        listeners={{
+          tabPress: e => {
+            if (!isAdminVerified) {
+              e.preventDefault();
+              Alert.alert(
+                "Access Denied",
+                "Your account is not yet verified by the admin."
+              );
+            }
+          }
+        }}
+        options={{
+          tabBarLabel: '',
+          tabBarIcon: () => (
+            <View style={styles.middleIconWrapper}>
+              <MaterialCommunityIcons name="plus" size={28} color="#fff" />
+            </View>
+          ),
+        }}
+      />
+
+      <Tab.Screen
+        name="Track"
+        component={TrackScreen}
+        listeners={{
+          tabPress: e => {
+            if (!isAdminVerified) {
+              e.preventDefault();
+              Alert.alert(
+                "Access Denied",
+                "Your account is not yet verified by the admin."
+              );
+            }
+          }
+        }}
+        options={{
+          tabBarLabel: 'My Requests',
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="document-text-outline" size={22} color={color} />
+          ),
+        }}
+      />
+
+      <Tab.Screen
+        name="Account"
+        component={AccountScreen}
+        options={{
+          tabBarLabel: 'Account',
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="person-outline" size={22} color={color} />
+          ),
+        }}
+      />
     </Tab.Navigator>
   );
 }

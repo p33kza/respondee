@@ -21,6 +21,7 @@ import { router } from 'expo-router';
 import { useAdmins } from '../../hooks/useUsers';
 import { useInventoryItems } from '../../hooks/useInventory';
 import { useCreateNotification } from '../../hooks/useNotifications';
+import * as DocumentPicker from 'expo-document-picker';
 
 const requestCategories = [
   { type: 'Event Equipment', icon: 'mic-outline', color: '#FF8C42' },
@@ -38,7 +39,14 @@ const requestCategories = [
 ];
 
 export default function LogisticsScreen() {
+  const [proofFiles, setProofFiles] = useState([]);
+
+  const handleFileChange = (e) => {
+    setProofFiles(Array.from(e.target.files));
+  };
+
     const [selectedType, setSelectedType] = useState('');
+    const [selectedTypes, setSelectedTypes] = useState([]);
     const [customCategory, setCustomCategory] = useState('');
     const [description, setDescription] = useState('');
     const [agreed, setAgreed] = useState(false);
@@ -50,12 +58,36 @@ export default function LogisticsScreen() {
     const [showCategoryModal, setShowCategoryModal] = useState(false);
     const [showInventoryModal, setShowInventoryModal] = useState(false);
     const [selectedItemIndex, setSelectedItemIndex] = useState(null);
-    
+    const [eventType, setEventType] = useState('');
+const [customEvent, setCustomEvent] = useState('');
+const [deceasedName, setDeceasedName] = useState(''); // For Wake/Lamay events
     const [eventDate, setEventDate] = useState(new Date());
     const [returnDate, setReturnDate] = useState(new Date(Date.now() + 24 * 60 * 60 * 1000));
     const [showEventDatePicker, setShowEventDatePicker] = useState(false);
     const [showReturnDatePicker, setShowReturnDatePicker] = useState(false);
+const [showEventModal, setShowEventModal] = useState(false);
 
+// Example Event Types
+const eventTypes = [
+  { type: 'Wake', color: '#FF6B6B', icon: 'heart' },
+  { type: 'Lamay', color: '#FF4757', icon: 'skull' },
+  { type: 'Birthday', color: '#FFA502', icon: 'cake' },
+  { type: 'Cleaning', color: '#1E90FF', icon: 'broom' },
+  { type: 'Others', color: '#A55EEA', icon: 'ellipsis-horizontal' },
+];
+
+// Handler to select Event Type
+const handleEventSelect = (type) => {
+  setEventType(type);
+
+  // Reset custom input if not Others
+  if (type !== 'Others') setCustomEvent('');
+  
+  // Reset deceased name if not Wake/Lamay
+  if (type !== 'Wake' && type !== 'Lamay') setDeceasedName('');
+
+  setShowEventModal(false); // close modal after selection
+}
     const user = useStoredUser();
     const { useCreateRequest } = useRequests();
     const { data: admins } = useAdmins();
@@ -136,11 +168,23 @@ export default function LogisticsScreen() {
       }
     };
 
-    const handleCategorySelect = useCallback((type) => {
-      setSelectedType(type);
-      setShowCategoryModal(false);
-      if (type !== 'Others') setCustomCategory('');
-    }, []);
+// Update handler for multi-select
+const handleCategorySelect = useCallback((type) => {
+  setSelectedTypes((prevSelected) => {
+    if (prevSelected.includes(type)) {
+      // Deselect if already selected
+      return prevSelected.filter((t) => t !== type);
+    } else {
+      // Add to selected array
+      return [...prevSelected, type];
+    }
+  });
+
+
+  // Clear custom category if 'Others' is not selected
+  if (type !== 'Others') setCustomCategory('');
+}, []);
+
 
     const onEventDateChange = (event, selectedDate) => {
       const currentDate = selectedDate || eventDate;
@@ -171,77 +215,138 @@ export default function LogisticsScreen() {
         day: 'numeric'
       });
     };
-
-    const handleSubmit = useCallback(() => {
-      if (!selectedType || !description || !agreed || !requestLocation) {
-        Alert.alert('Error', 'Please fill in all required fields.');
-        return;
-      }
-
-      const validItems = items.filter(item => item.item?.trim() && item.quantity?.trim());
-      if (validItems.length === 0) {
-        Alert.alert('Error', 'Please add at least one valid item with quantity.');
-        return;
-      }
-
-      const finalTitle = selectedType === 'Others' ? customCategory : selectedType;
-      
-      const requestData = {
-        type: 'logistics',
-        title: finalTitle,
-        description,
-        status: 'pending',
-        priority: isEmergency ? 'high' : 'medium', 
-        userId: user?.id,
-        logisticsObj: {
-          items: validItems.map(item => ({
-            item: item.item,
-            quantity: item.quantity
-          })),
-          eventDate: eventDate.toISOString(),
-          returnDate: returnDate.toISOString(),
-          location: requestLocation,
-          isReturned: false 
-        },
-        date: new Date().toISOString(),
-        isStarred: false,
-        isSpam: false,
-        isRead: false,
-        isNew: true,
-        labelAs: 'none' 
+ const fileToBase64String = async (file) => {
+  if (file.uri) {
+    // React Native / Expo
+    const FileSystem = await import('expo-file-system');
+    return await FileSystem.readAsStringAsync(file.uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+  } else if (file instanceof File) {
+    // Web
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64String = reader.result.split(',')[1];
+        resolve(base64String);
       };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  } else {
+    throw new Error('Unknown file object');
+  }
+};
 
-      submitRequest(requestData, {
-        onSuccess: (data) => {
-          admins?.forEach(admin => {
-            createNotification({
-              userId: admin.id,
-              requestId: data?.id,
-              requestType: 'logistics',
-              title: 'New Logistics Request',
-              description: `A new logistics request for ${finalTitle} has been submitted`,
-            });
-          });
-          Alert.alert('Success', 'Logistics request submitted successfully!', [
-            { text: 'OK', onPress: () => {
-              setSelectedType('');
-              setCustomCategory('');
-              setDescription('');
-              setAgreed(false);
-              setIsEmergency(false);
-              setRequestLocation('');
-              setItems([{ item: '', quantity: '' }]);
-              setEventDate(new Date());
-              setReturnDate(new Date(Date.now() + 24 * 60 * 60 * 1000));
-            }}
-          ]);
-        },
-        onError: (error) => {
-          Alert.alert('Error', 'Failed to submit request. Please try again.');
-          console.error('Submit error:', error);
-        }
+
+
+    const handleSubmit = useCallback(async () => {
+  console.log('Submitting, proofFiles:', proofFiles);
+
+  // Validation
+  if (!selectedTypes?.length || !description || !agreed || !requestLocation) {
+    Alert.alert('Error', 'Please fill in all required fields.');
+    return;
+  }
+
+  const validItems = items.filter(item => item.item?.trim() && item.quantity?.trim());
+  if (validItems.length === 0) {
+    Alert.alert('Error', 'Please add at least one valid item with quantity.');
+    return;
+  }
+
+  // Build title string
+  let finalTitle = '';
+  if (selectedTypes.length === 1) {
+    finalTitle = selectedTypes[0];
+  } else if (selectedTypes.length === 2) {
+    finalTitle = `${selectedTypes[0]} and ${selectedTypes[1]}`;
+  } else {
+    const allButLast = selectedTypes.slice(0, -1).join(', ');
+    const last = selectedTypes[selectedTypes.length - 1];
+    finalTitle = `${allButLast}, and ${last}`;
+  }
+// Convert files to Base64 strings
+let base64Files = [];
+try {
+  base64Files = await Promise.all(proofFiles.map(file => fileToBase64String(file)));
+} catch (err) {
+  console.error('Error converting files:', err);
+  Alert.alert('Error', 'Failed to process selected files.');
+  return;
+}
+
+console.log('Base64 files prepared:', base64Files);
+
+const payload = {
+  type: 'logistics',
+  title: finalTitle,
+  description,
+  status: 'pending',
+  priority: isEmergency ? 'high' : 'medium',
+  userId: user?.id,
+  date: new Date().toISOString(),
+  logisticsObj: {
+    items: validItems.map(item => ({ item: item.item, quantity: item.quantity })),
+    eventDate: eventDate.toISOString(),
+    returnDate: returnDate.toISOString(),
+    location: requestLocation,
+    isReturned: false,
+  },
+  proofFiles: base64Files, // ✅ Now guaranteed to be serializable
+};
+
+
+  console.log('Payload to submit:', payload); // DEBUG: Verify Base64 included
+
+  // Submit request
+  submitRequest(payload, {
+    onSuccess: (data) => {
+      console.log('Request submitted successfully:', data);
+      admins?.forEach(admin => {
+        createNotification({
+          userId: admin.id,
+          requestId: data?.id,
+          requestType: 'logistics',
+          title: 'New Logistics Request',
+          description: `A new logistics request for ${finalTitle} has been submitted`,
+        });
       });
-    }, [selectedType, customCategory, description, agreed, requestLocation, isEmergency, items, eventDate, returnDate, user?.id, submitRequest]);
+
+      Alert.alert('Success', 'Logistics request submitted successfully!', [
+        { text: 'OK', onPress: () => {
+          setSelectedTypes([]);
+          setDescription('');
+          setAgreed(false);
+          setIsEmergency(false);
+          setRequestLocation('');
+          setItems([{ item: '', quantity: '' }]);
+          setEventDate(new Date());
+          setReturnDate(new Date(Date.now() + 24 * 60 * 60 * 1000));
+          setProofFiles([]);
+        }}
+      ]);
+    },
+    onError: (error) => {
+      console.error('Submit error:', error);
+      Alert.alert('Error', 'Failed to submit request. Please try again.');
+    }
+  });
+}, [
+  selectedTypes,
+  description,
+  agreed,
+  requestLocation,
+  isEmergency,
+  items,
+  eventDate,
+  returnDate,
+  user?.id,
+  submitRequest,
+  proofFiles,
+  admins,
+  createNotification
+]);
 
     const selectedCategory = requestCategories.find(cat => cat.type === selectedType);
 
@@ -305,56 +410,196 @@ export default function LogisticsScreen() {
               </View>
             )}
           </View>
-
-          {/* Items Section */}
+          
+          {/* Event Type Section */}
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Items Needed <Text style={styles.required}>*</Text></Text>
-            <View style={styles.itemsContainer}>
-              {items.map((item, index) => (
-                <View key={`item-${index}`} style={styles.itemCard}>
-                  <View style={styles.itemRow}>
-                    <TouchableOpacity 
-                      style={[styles.itemInput, styles.itemNameInput, styles.itemSelector]}
-                      onPress={() => openInventoryModal(index)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.itemSelectorText, !item.item && styles.itemSelectorPlaceholder]}>
-                        {item.item || 'Select Item'}
-                      </Text>
-                      <Ionicons name="chevron-down" size={16} color="#666" />
-                    </TouchableOpacity>
-                    <TextInput
-                      style={[styles.itemInput, styles.itemQuantityInput]}
-                      placeholder="Qty"
-                      value={item.quantity}
-                      onChangeText={(text) => handleQuantityChange(index, text)}
-                      keyboardType="numeric"
-                      placeholderTextColor="#999"
-                    />
-                    {items.length > 1 && (
-                      <TouchableOpacity 
-                        style={styles.removeItemButton}
-                        onPress={() => removeItem(index)}
-                        activeOpacity={0.7}
-                      >
-                        <Ionicons name="close-circle" size={20} color="#FF6B6B" />
-                      </TouchableOpacity>
-                    )}
+            <Text style={styles.sectionLabel}>
+              Event Type <Text style={styles.required}>*</Text>
+            </Text>
+            <TouchableOpacity
+              style={[styles.dropdownButton, eventType && styles.dropdownButtonSelected]}
+              onPress={() => setShowEventModal(true)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.dropdownText, !eventType && styles.placeholder]}>
+                {eventType || 'Choose event type'}
+              </Text>
+              <Ionicons name="chevron-down" size={20} color="#666" />
+            </TouchableOpacity>
+
+            {/* Show custom input if "Others" is selected */}
+            {eventType === 'Others' && (
+              <View style={styles.customCategoryContainer}>
+                <Text style={styles.sectionLabel}>
+                  Specify Event <Text style={styles.required}>*</Text>
+                </Text>
+                <TextInput
+                  style={styles.customInput}
+                  placeholder="Enter custom event type"
+                  value={customEvent}
+                  onChangeText={setCustomEvent}
+                  maxLength={50}
+                  placeholderTextColor="#999"
+                />
+              </View>
+            )}
+
+            {(eventType === 'Wake' || eventType === 'Lamay') && (
+              <View style={styles.customCategoryContainer}>
+                <Text style={styles.sectionLabel}>
+                  Name of Deceased <Text style={styles.required}>*</Text>
+                </Text>
+                <TextInput
+                  style={styles.customInput}
+                  placeholder="Enter name"
+                  value={deceasedName}
+                  onChangeText={setDeceasedName}
+                  maxLength={50}
+                  placeholderTextColor="#999"
+                />
+              </View>
+            )}
+            </View>
+
+            {/* Items Section */}
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Items Needed <Text style={styles.required}>*</Text></Text>
+              <View style={styles.itemsContainer}>
+                {items.map((item, index) => {
+                  // Find inventory item for stock
+                  const inventoryItem = inventory?.find(inv => inv.item === item.item);
+                  // Calculate remaining stock after current selections
+                  const usedQty = items.reduce((sum, it, idx) => {
+                    if (it.item === item.item && idx !== index) {
+                      return sum + (parseInt(it.quantity) || 0);
+                    }
+                    return sum;
+                  }, 0);
+                  const availableQty = inventoryItem ? Math.max((inventoryItem.quantity || 0) - usedQty, 0) : undefined;
+
+                  return (
+                    <View key={`item-${index}`} style={styles.itemCard}>
+                      <View style={styles.itemRow}>
+                        <TouchableOpacity 
+                          style={[styles.itemInput, styles.itemNameInput, styles.itemSelector]}
+                          onPress={() => openInventoryModal(index)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[styles.itemSelectorText, !item.item && styles.itemSelectorPlaceholder]}>
+                            {item.item || 'Select Item'}
+                          </Text>
+                          <Ionicons name="chevron-down" size={16} color="#666" />
+                        </TouchableOpacity>
+                        <TextInput
+                          style={[styles.itemInput, styles.itemQuantityInput]}
+                          placeholder="Qty"
+                          value={item.quantity}
+                          onChangeText={(text) => {
+                            // Limit input to availableQty
+                            let val = text.replace(/[^0-9]/g, '');
+                            if (availableQty !== undefined && val) {
+                              val = Math.min(parseInt(val), availableQty).toString();
+                            }
+                            handleQuantityChange(index, val);
+                          }}
+                          keyboardType="numeric"
+                          placeholderTextColor="#999"
+                          editable={!!item.item}
+                          maxLength={4}
+                        />
+                        {items.length > 1 && (
+                          <TouchableOpacity 
+                            style={styles.removeItemButton}
+                            onPress={() => removeItem(index)}
+                            activeOpacity={0.7}
+                          >
+                            <Ionicons name="close-circle" size={20} color="#FF6B6B" />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                      {item.item && inventoryItem && (
+                        <Text style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>
+                          Available: {availableQty}
+                        </Text>
+                      )}
+                    </View>
+                  );
+                })}
+                
+                <TouchableOpacity 
+                  style={styles.addMoreButton}
+                  onPress={addMoreItems}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="add-circle-outline" size={20} color="#FF8C42" />
+                  <Text style={styles.addMoreText}>Add More Items</Text>
+                </TouchableOpacity>
+              </View>
+              {/* Show total sum of quantities */}
+              <Text style={{ fontSize: 14, color: '#334155', marginTop: 8 }}>
+                Total Quantity: {items.reduce((sum, item) => sum + (parseInt(item.quantity) || 0), 0)}
+              </Text>
+            </View>
+        <Modal
+          visible={showInventoryModal}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => {
+            setShowInventoryModal(false);
+            setSelectedItemIndex(null);
+          }}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Select Inventory Item</Text>
+                <TouchableOpacity 
+                  onPress={() => {
+                    setShowInventoryModal(false);
+                    setSelectedItemIndex(null);
+                  }}
+                  style={styles.modalCloseButton}
+                >
+                  <Ionicons name="close" size={24} color="#666" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={styles.modalList}>
+                {inventory?.map((inventoryItem, index) => (
+                  <TouchableOpacity
+                    key={inventoryItem.id ? `inventory-${inventoryItem.id}` : `inventory-${index}-${inventoryItem.item || 'unknown'}`}
+                    style={styles.inventoryItem}
+                    onPress={() => handleInventoryItemSelect(inventoryItem)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.inventoryItemContent}>
+                      <Text style={styles.inventoryItemName}>{inventoryItem.item}</Text>
+                      {inventoryItem.description && (
+                        <Text style={styles.inventoryItemDescription}>{inventoryItem.description}</Text>
+                      )}
+                      <View style={styles.inventoryItemMeta}>
+                        <Text style={[styles.inventoryItemStock, 
+                          inventoryItem.quantity > 0 ? styles.inStock : styles.outOfStock
+                        ]}>
+                          Stock: {inventoryItem.quantity || 0}
+                        </Text>
+                        {inventoryItem.category && (
+                          <Text style={styles.inventoryItemCategory}>{inventoryItem.category}</Text>
+                        )}
+                      </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color="#999" />
+                  </TouchableOpacity>
+                ))}
+                {(!inventory || inventory.length === 0) && (
+                  <View style={styles.emptyInventory}>
+                    <Ionicons name="cube-outline" size={48} color="#999" />
+                    <Text style={styles.emptyInventoryText}>No inventory items available</Text>
                   </View>
-                </View>
-              ))}
-              
-              <TouchableOpacity 
-                style={styles.addMoreButton}
-                onPress={addMoreItems}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="add-circle-outline" size={20} color="#FF8C42" />
-                <Text style={styles.addMoreText}>Add More Items</Text>
-              </TouchableOpacity>
+                )}
+              </ScrollView>
             </View>
           </View>
-
+        </Modal>
           {/* Date Section */}
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>Event Schedule <Text style={styles.required}>*</Text></Text>
@@ -446,6 +691,41 @@ export default function LogisticsScreen() {
             )}
           </View>
 
+ <View style={styles.section}>
+      <Text style={styles.sectionLabel}>Proof Images & Documents</Text>
+
+      <TouchableOpacity
+        style={styles.uploadButton}
+        activeOpacity={0.7}
+        onPress={() => document.getElementById('fileInput').click()}
+      >
+        <Ionicons name="cloud-upload-outline" size={20} color="#FF8C42" />
+        <Text style={styles.uploadButtonText}>
+          {proofFiles.length > 0
+            ? `${proofFiles.length} file(s) selected`
+            : 'Upload files'}
+        </Text>
+      </TouchableOpacity>
+
+      <input
+        type="file"
+        id="fileInput"
+        multiple
+        onChange={handleFileChange}
+        style={{ display: 'none' }}
+      />
+
+      <TouchableOpacity
+        style={styles.submitButton}
+        onPress={handleSubmit}
+      >
+        <Text style={styles.submitButtonText}>Submit</Text>
+      </TouchableOpacity>
+    </View>
+
+ 
+
+             
           {/* Priority Toggle */}
           <View style={styles.section}>
             <View style={styles.emergencyContainer}>
@@ -489,21 +769,42 @@ export default function LogisticsScreen() {
           </View>
 
           {/* Submit Button */}
-          <TouchableOpacity 
-            style={[styles.submitBtn, (!agreed || !selectedType || !description || !requestLocation || isSubmitting) && styles.submitBtnDisabled]} 
-            onPress={handleSubmit}
-            activeOpacity={0.8}
-            disabled={!agreed || !selectedType || !description || !requestLocation || isSubmitting}
-          >
-            {isSubmitting ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <>
-                <Text style={styles.submitText}>Submit Request</Text>
-                <Ionicons name="arrow-forward" size={16} color="#fff" style={styles.submitIcon} />
-              </>
-            )}
-          </TouchableOpacity>
+                <TouchableOpacity 
+                style={[
+                  styles.submitBtn, 
+                  (
+                  !agreed || 
+                  !selectedTypes?.length || 
+                  !description || 
+                  !requestLocation || 
+                  isSubmitting ||
+                  !eventType ||
+                  (eventType === 'Others' && !customEvent) ||
+                  ((eventType === 'Wake' || eventType === 'Lamay') && !deceasedName)
+                  ) && styles.submitBtnDisabled
+                ]} 
+                onPress={handleSubmit}
+                activeOpacity={0.8}
+                disabled={
+                  !agreed || 
+                  !selectedTypes?.length || 
+                  !description || 
+                  !requestLocation || 
+                  isSubmitting ||
+                  !eventType ||
+                  (eventType === 'Others' && !customEvent) ||
+                  ((eventType === 'Wake' || eventType === 'Lamay') && !deceasedName)
+                }
+                >
+                {isSubmitting ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <>
+                  <Text style={styles.submitText}>Submit Request</Text>
+                  <Ionicons name="arrow-forward" size={16} color="#fff" style={styles.submitIcon} />
+                  </>
+                )}
+                </TouchableOpacity>
         </ScrollView>
 
         {/* Date Pickers */}
@@ -530,6 +831,48 @@ export default function LogisticsScreen() {
             minimumDate={eventDate}
           />
         )}
+{/* Event Type Modal */}
+<Modal
+  visible={showEventModal}
+  transparent={true}
+  animationType="slide"
+  onRequestClose={() => setShowEventModal(false)}
+>
+  <View style={styles.modalOverlay}>
+    <View style={styles.modalContent}>
+      <View style={styles.modalHeader}>
+        <Text style={styles.modalTitle}>Select Event Type</Text>
+        <TouchableOpacity 
+          onPress={() => setShowEventModal(false)}
+          style={styles.modalCloseButton}
+        >
+          <Ionicons name="close" size={24} color="#666" />
+        </TouchableOpacity>
+      </View>
+      <ScrollView style={styles.modalList}>
+        {eventTypes.map((event, index) => (
+          <TouchableOpacity
+            key={`event-${index}-${event.type}`}
+            style={[
+              styles.modalItem,
+              eventType === event.type && styles.modalItemSelected
+            ]}
+            onPress={() => handleEventSelect(event.type)}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.categoryIcon, { backgroundColor: event.color }]}>
+              <Ionicons name={event.icon} size={18} color="#fff" />
+            </View>
+            <Text style={styles.modalItemText}>{event.type}</Text>
+            {eventType === event.type && (
+              <Ionicons name="checkmark" size={20} color="#FF8C42" />
+            )}
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  </View>
+</Modal>
 
         {/* Category Selection Modal */}
         <Modal
@@ -551,90 +894,31 @@ export default function LogisticsScreen() {
               </View>
               <ScrollView style={styles.modalList}>
                 {requestCategories.map((category, index) => (
-                  <TouchableOpacity
-                    key={`category-${index}-${category.type}`}
-                    style={[
-                      styles.modalItem,
-                      selectedType === category.type && styles.modalItemSelected
-                    ]}
-                    onPress={() => handleCategorySelect(category.type)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={[styles.categoryIcon, { backgroundColor: category.color }]}>
-                      <Ionicons name={category.icon} size={18} color="#fff" />
-                    </View>
-                    <Text style={styles.modalItemText}>{category.type}</Text>
-                    {selectedType === category.type && (
-                      <Ionicons name="checkmark" size={20} color="#FF8C42" />
-                    )}
-                  </TouchableOpacity>
+               <TouchableOpacity
+  key={`category-${index}-${category.type}`}
+  style={[
+    styles.modalItem,
+    selectedTypes.includes(category.type) && styles.modalItemSelected
+  ]}
+  onPress={() => handleCategorySelect(category.type)}
+  activeOpacity={0.7}
+>
+  <View style={[styles.categoryIcon, { backgroundColor: category.color }]}>
+    <Ionicons name={category.icon} size={18} color="#fff" />
+  </View>
+  <Text style={styles.modalItemText}>{category.type}</Text>
+  {selectedTypes.includes(category.type) && (
+    <Ionicons name="checkmark" size={20} color="#FF8C42" />
+  )}
+</TouchableOpacity>
+
                 ))}
               </ScrollView>
             </View>
           </View>
         </Modal>
 
-        {/* Inventory Selection Modal */}
-        <Modal
-          visible={showInventoryModal}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={() => {
-            setShowInventoryModal(false);
-            setSelectedItemIndex(null);
-          }}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Select Inventory Item</Text>
-                <TouchableOpacity 
-                  onPress={() => {
-                    setShowInventoryModal(false);
-                    setSelectedItemIndex(null);
-                  }}
-                  style={styles.modalCloseButton}
-                >
-                  <Ionicons name="close" size={24} color="#666" />
-                </TouchableOpacity>
-              </View>
-              <ScrollView style={styles.modalList}>
-                {inventory?.map((inventoryItem, index) => (
-                  <TouchableOpacity
-                    key={inventoryItem.id ? `inventory-${inventoryItem.id}` : `inventory-${index}-${inventoryItem.item || 'unknown'}`}
-                    style={styles.inventoryItem}
-                    onPress={() => handleInventoryItemSelect(inventoryItem)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.inventoryItemContent}>
-                      <Text style={styles.inventoryItemName}>{inventoryItem.item}</Text>
-                      {inventoryItem.description && (
-                        <Text style={styles.inventoryItemDescription}>{inventoryItem.description}</Text>
-                      )}
-                      <View style={styles.inventoryItemMeta}>
-                        <Text style={[styles.inventoryItemStock, 
-                          inventoryItem.quantity > 0 ? styles.inStock : styles.outOfStock
-                        ]}>
-                          Stock: {inventoryItem.quantity || 0}
-                        </Text>
-                        {inventoryItem.category && (
-                          <Text style={styles.inventoryItemCategory}>{inventoryItem.category}</Text>
-                        )}
-                      </View>
-                    </View>
-                    <Ionicons name="chevron-forward" size={20} color="#999" />
-                  </TouchableOpacity>
-                ))}
-                {(!inventory || inventory.length === 0) && (
-                  <View style={styles.emptyInventory}>
-                    <Ionicons name="cube-outline" size={48} color="#999" />
-                    <Text style={styles.emptyInventoryText}>No inventory items available</Text>
-                  </View>
-                )}
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
+      
       </View>
     );
 }

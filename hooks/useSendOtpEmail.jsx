@@ -5,10 +5,10 @@ export function useSendOtpEmail() {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
 
-  const sendOtpEmail = async (email, displayName, otpCode) => {
-    setLoading(true);
-    setError(null);
-    setSuccess(false);
+ const sendOtpEmail = async (email, displayName, otpCode) => {
+  setLoading(true);
+  setError(null);
+  setSuccess(false);
 
     try {
       const htmlBody = `
@@ -41,34 +41,42 @@ export function useSendOtpEmail() {
         </body>
         </html>
       `;
+ 
+ const response = await fetch('https://innovatechservicesph.com/api/email', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    api_key: 'A0466E9D-FC3A-4B94-9DB4-1ADBB7F41AAD',
+    smtp_host: 'smtp.hostinger.com',
+    smtp_port: 587,
+    smtp_user: 'support@tcuregistrarrequest.site',
+    smtp_password: '#228JyiuS', 
+    use_tls: true,
+    to_email: email,
+    to_name: displayName,
+    from_name: 'Respondee',
+    subject: 'Your OTP Code',
+    body: htmlBody,
+  }),
+});
 
-      const response = await fetch('https://innovatechservicesph.com/api/email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          api_key: 'A0466E9D-FC3A-4B94-9DB4-1ADBB7F41AAD',
-          smtp_host: 'smtp.hostinger.com',
-          smtp_port: 587,
-          smtp_user: 'support@tcuregistrarrequest.site',
-          smtp_password: '#228JyiuS', 
-          use_tls: true,
-          to_email: email,
-          to_name: displayName,
-          from_name: 'Respondee',
-          subject: 'Your OTP Code',
-          body: htmlBody,
-        }),
-      });
+const data = await response.json(); // ✅ basahin yung body
 
-      if (!response.ok) throw new Error('Failed to send OTP email');
+if (!response.ok || !data.message?.includes("success")) {
+  throw new Error(data.message || 'Failed to send OTP email');
+}
 
-      setSuccess(true);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+setSuccess(true);
+return { success: true };
+
+  } catch (err) {
+    setError(err.message);
+    return { success: false, error: err.message }; // ✅ important
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return { sendOtpEmail, loading, error, success };
 }

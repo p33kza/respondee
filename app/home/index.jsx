@@ -139,6 +139,10 @@ export default function HomeScreen() {
     .sort((a, b) => new Date(b.date) - new Date(a.date))
     .slice(0, 3);
 
+ 
+
+  const isVerified = user?.adminVerified !== false;
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView 
@@ -177,12 +181,14 @@ export default function HomeScreen() {
               <TouchableOpacity
                 key={i}
                 style={styles.iconAction}
-                onPress={() => router.push(item.route)}
+                onPress={isVerified ? () => router.push(item.route) : undefined}
+                disabled={!isVerified}
+                activeOpacity={isVerified ? 0.7 : 1}
               >
-                <View style={styles.iconCircle}>
+                <View style={[styles.iconCircle, !isVerified && { opacity: 0.5 }]}>
                   <Ionicons name={item.icon} size={24} color="#FF8C42" />
                 </View>
-                <Text style={styles.iconLabel}>{item.label}</Text>
+                <Text style={[styles.iconLabel, !isVerified && { color: '#94A3B8' }]}>{item.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -240,7 +246,25 @@ export default function HomeScreen() {
             <View style={styles.requestsList}>
               {recentRequests.map(item => (
                 <View key={item.id} >
-                  {renderRequestCard({ item })}
+                  {/* Preview only if not verified, disable clicks */}
+                  <TouchableOpacity
+                    disabled={!isVerified}
+                    activeOpacity={isVerified ? 0.7 : 1}
+                    style={!isVerified ? { opacity: 0.5 } : undefined}
+                    onPress={
+                      isVerified
+                        ? () => {
+                            if (item.type === 'logistics') {
+                              navigation.navigate('logisticsView', { requestId: item.id });
+                            } else {
+                              navigation.navigate('complaintsView', { requestId: item.id });
+                            }
+                          }
+                        : undefined
+                    }
+                  >
+                    {renderRequestCard({ item })}
+                  </TouchableOpacity>
                 </View>
               ))}
             </View>
@@ -253,7 +277,8 @@ export default function HomeScreen() {
               </Text>
               <TouchableOpacity 
                 style={styles.createButton}
-                onPress={() => router.push('/home/complaint')}
+                onPress={isVerified ? () => router.push('/home/complaint') : undefined}
+                disabled={!isVerified}
               >
                 <Text style={styles.createButtonText}>Create Request</Text>
               </TouchableOpacity>

@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Respondee",
-    "slug": "respondee",
+    "slug": "respondee4",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -48,7 +48,7 @@
       [
         "expo-font",
         {
-          "fonts": ["./assets/fonts/Inter.ttf"]
+          "fonts": ["./assets/fonts/SpaceMono-Regular.ttf"]
         }
       ]
     ],

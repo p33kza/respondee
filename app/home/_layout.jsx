@@ -53,7 +53,7 @@ function MainTabs() {
             if (!isAdminVerified) {
               e.preventDefault();
               Alert.alert(
-                "Prewview Only",
+                "Preview Only",
                 "Your account is not yet verified by the admin."
               );
             }

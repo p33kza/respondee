@@ -1,0 +1,69 @@
+{
+  "expo": {
+    "name": "Respondee",
+    "slug": "respondee",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "respondee",
+    "userInterfaceStyle": "automatic",
+    "jsEngine": "hermes",
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/1354a60c-30d1-495b-af3f-f956e9e2e993",
+      "fallbackToCacheTimeout": 0
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.enragetp.respondee",
+      "buildNumber": "1.0.0"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.enragetp.respondee",
+      "versionCode": 1,
+      "permissions": []
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/Logo.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-font",
+        {
+          "fonts": ["./assets/fonts/Inter.ttf"]
+        }
+      ]
+    ],
+    "extra": {
+      "router": {
+        "origin": false,
+        "unstable_src": "./app"
+      },
+      "eas": {
+        "projectId": "1354a60c-30d1-495b-af3f-f956e9e2e993"
+      }
+    },
+    "experiments": {
+      "typedRoutes": true,
+      "tsconfigPaths": true
+    }
+  }
+}

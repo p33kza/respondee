@@ -164,10 +164,6 @@ export default function HomeScreen() {
             <View style={{ marginLeft: 12 }}>
               <Text style={styles.welcomeText}>Welcome back,</Text>
               <Text style={styles.name}>{user?.displayName || 'User'}</Text>
-              <TouchableOpacity style={styles.verifyButton}>
-                <Text style={styles.verifyText}>Verify Account</Text>
-                <Ionicons name="chevron-forward" size={12} color="#FF8C42" />
-              </TouchableOpacity>
             </View>
           </View>
           <Image source={require('../../assets/images/176.png')} style={styles.promoImage} />

@@ -21,6 +21,8 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUsers } from '../../hooks/useUsers';
 import { useSendOtpEmail } from '../../hooks/useSendOtpEmail';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 
 const { width, height } = Dimensions.get('window');
 
@@ -36,12 +38,36 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [focusedInput, setFocusedInput] = useState('');
+const [govId, setGovId] = useState(null); // store file metadata
+const [govIdBase64, setGovIdBase64] = useState(null); // store converted base64
+const pickGovId = async () => {
+  try {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images, // you can allow pdf with DocumentPicker
+      allowsEditing: true,
+      quality: 0.8,
+    });
 
+    if (!result.canceled) {
+      const fileUri = result.assets[0].uri;
+      setGovId(fileUri);
+
+      // convert to base64
+      const base64String = await FileSystem.readAsStringAsync(fileUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      setGovIdBase64(base64String);
+    }
+  } catch (err) {
+    console.error("Error picking Gov ID:", err);
+  }
+};
   const handleContinue = async () => {
   if (!firstName || !lastName || !email) {
     Alert.alert('Error', 'Please fill in all required fields.');
     return;
   }
+
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
@@ -70,16 +96,18 @@ export default function RegisterScreen() {
     setLoading(true);
 
     try {
-      const userData = {
-        email,
-        password: 'QWERTYUIOP1234567890!@#$%^&*()',
-        phone: phoneNumber ? `+63${phoneNumber}` : undefined,
-        name,
-        emailVerified: true,
-        phoneVerified: false,
-        role: 'user',
-        userIsNew: true
-      };
+  const userData = {
+  email,
+  password: 'QWERTYUIOP1234567890!@#$%^&*()',
+  phone: phoneNumber ? `+63${phoneNumber}` : undefined,
+  name,
+  emailVerified: true,
+  phoneVerified: false,
+  role: 'user',
+  userIsNew: true,
+  govId: govIdBase64, // ⬅️ attach base64 here
+};
+
 
       sendOtpEmail(email, name, otp);
 
@@ -165,6 +193,18 @@ export default function RegisterScreen() {
                   />
                 </View>
               </View>
+              <View style={styles.inputGroup}>
+  <Text style={styles.inputLabel}>Government ID *</Text>
+  <TouchableOpacity 
+    style={styles.inputContainer}
+    onPress={pickGovId}
+  >
+    <Text style={styles.uploadButtonText}>
+      {govId ? "ID Selected ✅" : "Upload Government ID"}
+    </Text>
+  </TouchableOpacity>
+</View>
+
               <View style={styles.nameRow}>
                 <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
                   <Text style={styles.inputLabel}>First Name *</Text>

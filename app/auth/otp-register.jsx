@@ -120,67 +120,58 @@ export default function OTPRegisterScreen() {
         showSuccessAnimation();
 
         try {
-            console.log('Attempting to register user with data:', userData);
-            
             const response = await registerMutation.mutateAsync(userData);
-            console.log('Registration successful, response:', response);
-            
+
             await AsyncStorage.multiRemove(['otp', 'email', 'pendingUserData']);
-            
+
             setTimeout(() => {
-            Alert.alert(
-                'Welcome! 🎉',
-                'Your account has been created successfully! You can now sign in.',
-                [{ text: 'Sign In', onPress: () => router.push('/auth/login') }]
-            );
+                Alert.alert(
+                    'Welcome! 🎉',
+                    'Your account has been created successfully! You can now sign in.',
+                    [{ text: 'Sign In', onPress: () => router.push('/auth/login') }]
+                );
             }, 1000);
         } catch (err) {
-            console.error('Registration error:', {
-            error: err,
-            response: err?.response,
-            data: err?.response?.data,
-            status: err?.response?.status,
-            headers: err?.response?.headers,
-            request: err?.request,
-            });
-            
             let errorMessage = 'Registration failed. Please try again.';
-            
-            if (err?.response?.data?.error?.includes('email-already-exists')) {
-            errorMessage = 'An account with this email already exists.';
+
+            // Network error handling
+            if (err?.message?.includes('Network request failed')) {
+                errorMessage = 'Network error. Please check your internet connection and try again.';
+            } else if (err?.response?.data?.error?.includes('email-already-exists')) {
+                errorMessage = 'An account with this email already exists.';
             } else if (err?.response?.data?.error) {
-            errorMessage = err.response.data.error;
+                errorMessage = err.response.data.error;
             } else if (err.message) {
-            errorMessage = err.message;
+                errorMessage = err.message;
             } else if (err.code) {
-            errorMessage = `Error code: ${err.code}`;
+                errorMessage = `Error code: ${err.code}`;
             }
-            
+
             Alert.alert(
-            'Registration Error',
-            errorMessage,
-            [
-                { text: 'OK', onPress: () => {} },
-                { 
-                text: 'View Details', 
-                onPress: () => {
-                    Alert.alert(
-                    'Error Details',
-                    JSON.stringify({
-                        status: err?.response?.status,
-                        error: err?.response?.data?.error || err.message,
-                        code: err.code,
-                    }, null, 2),
-                    [{ text: 'OK' }]
-                    );
-                }
-                }
-            ]
+                'Registration Error',
+                errorMessage,
+                [
+                    { text: 'OK', onPress: () => {} },
+                    err?.message && { 
+                        text: 'View Details', 
+                        onPress: () => {
+                            Alert.alert(
+                                'Error Details',
+                                JSON.stringify({
+                                    status: err?.response?.status,
+                                    error: err?.response?.data?.error || err.message,
+                                    code: err.code,
+                                }, null, 2),
+                                [{ text: 'OK' }]
+                            );
+                        }
+                    }
+                ].filter(Boolean)
             );
-            
+
             setIsVerifying(false);
         }
-        };
+    };
 
     const handleOtpInput = (value, index) => {
         setError('');

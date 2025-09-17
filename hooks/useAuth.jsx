@@ -7,21 +7,46 @@ import {
   sendVerificationCode,
   verifyCode,
 } from '../apis/authAPI';
+import { API_BASE_URL } from '../apis/api';
 
-export const useRegister = () => {
-  const queryClient = useQueryClient();
-  
+
+export function useRegister() {
   return useMutation({
-    mutationFn: registerUser,
-    onSuccess: (data) => {
-      queryClient.invalidateQueries(['users']);
+    mutationFn: async (payload) => {
+      const url = `${API_BASE_URL}/api/auth/register`;
+
+      const isFormData = typeof FormData !== 'undefined' && payload instanceof FormData;
+      const headers = isFormData
+        ? { Accept: 'application/json' } // let fetch set boundary
+        : { 'Content-Type': 'application/json', Accept: 'application/json' };
+
+      console.log('[useRegister] POST', url, {
+        preview: isFormData
+          ? 'FormData(...)'
+          : { ...payload, password: payload?.password ? '***' : undefined, govId: payload?.govId ? '(omitted)' : undefined }
+      });
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: isFormData ? payload : JSON.stringify(payload),
+      });
+
+      const text = await res.text();
+      let data;
+      try { data = text ? JSON.parse(text) : {}; } catch { data = { error: text }; }
+
+      if (!res.ok) {
+        const err = new Error(data?.error || data?.message || `HTTP ${res.status}`);
+        err.status = res.status;
+        err.data = data;
+        throw err;
+      }
+
       return data;
-    },
-    onError: (error) => {
-      throw error;
-    },
+    }
   });
-};
+}
 
 export const useLogin = () => {
   const queryClient = useQueryClient();

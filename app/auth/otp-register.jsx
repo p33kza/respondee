@@ -18,6 +18,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRegister } from '../../hooks/useAuth';
 import { Ionicons } from '@expo/vector-icons';
 import { useSendOtpEmail } from '../../hooks/useSendOtpEmail';
+import { API_BASE_URL } from '../../apis/api';
 
 const { width, height } = Dimensions.get('window');
 
@@ -45,7 +46,6 @@ const extractError = (err) => {
     return { status: null, message: err?.message || 'Unknown error', code: null, data: null, raw: err };
   }
 };
-
 
 
 export default function OTPRegisterScreen() {
@@ -122,6 +122,29 @@ export default function OTPRegisterScreen() {
     }).start();
   };
 
+  // Upload govId to backend -> Storage, then backend sets users/{uid}.verificationImage
+  const uploadVerificationImage = async (uid, base64) => {
+    const url = `${API_BASE_URL}/api/users/${uid}/verification-image`;
+    const body = {
+      imageBase64: String(base64).replace(/^data:image\/\w+;base64,/, ''),
+      contentType: 'image/jpeg',
+    };
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const text = await res.text();
+    let data;
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      data = { error: text };
+    }
+    if (!res.ok) throw new Error(data?.error || data?.message || `HTTP ${res.status}`);
+    return data?.url;
+  };
+
   const handleRegisterUser = async () => {
     if (!userData) {
       Alert.alert('Error', 'User data not found. Please start registration again.');
@@ -136,16 +159,18 @@ export default function OTPRegisterScreen() {
       // Prepare a safe payload (strip ImagePicker object or oversized base64)
       const buildSafeUserData = () => {
         const copy = { ...(userData || {}) };
+        // Ensure backend gets displayName
+        copy.displayName = copy.displayName || copy.name || copy.fullName || '';
         const gov = copy.govId;
         const isPickerAsset = gov && typeof gov === 'object' && (gov.uri || gov.assets);
-        const isHugeBase64 = typeof gov === 'string' && gov.length > 2_000_000; // ~2MB
+        const isHugeBase64 = typeof gov === 'string' && gov.length > 2_000_000;
         if (isPickerAsset || isHugeBase64) {
           console.warn('[register] omitting govId from payload (non-serializable or too large)');
           delete copy.govId;
         }
         return copy;
       };
-
+      
       const safeUserData = buildSafeUserData();
 
       // Safe log
@@ -179,6 +204,17 @@ export default function OTPRegisterScreen() {
       }
 
       console.log('[register] success response', response);
+
+      // Upload verification image after user creation
+      const uid = response?.uid;
+      if (uid && userData?.govId) {
+        try {
+          const url = await uploadVerificationImage(uid, userData.govId);
+          console.log('[register] verification image uploaded', url);
+        } catch (e) {
+          console.warn('[register] upload verification image failed:', e?.message || e);
+        }
+      }
 
       await AsyncStorage.multiRemove(['otp', 'email', 'pendingUserData']);
 

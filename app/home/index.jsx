@@ -17,15 +17,21 @@ import { ScrollView } from 'react-native';
 import { useStoredUser } from '../../hooks/useStoredUser';
 import { useRequests } from '../../hooks/useRequests';
 import { useNavigation } from '@react-navigation/native';
+import { useUser } from '../../hooks/useUsers';
+import { getStorage, ref as storageRef, getDownloadURL } from 'firebase/storage';
 
 export default function HomeScreen() {
   const navigation = useNavigation();
   const router = useRouter();
-  const user = useStoredUser();
+  const storedUser = useStoredUser();
   const { useGetRequestsByUser } = useRequests();
-  
-  const { data: userRequests = [], isLoading, refetch, isRefreshing } = useGetRequestsByUser(user?.id);
-  
+  const { data: dbUser, refetch: refetchUser } = useUser(storedUser?.id);
+  const currentUser = dbUser ?? storedUser;
+  const [avatarUri, setAvatarUri] = React.useState(null);
+  const verifiedHandledRef = useRef(false); // prevent duplicate alerts
+
+  const { data: userRequests = [], isLoading, refetch, isRefreshing } = useGetRequestsByUser(storedUser?.id);
+
   const [refreshing, setRefreshing] = useState(false);
 
   const actions = [
@@ -139,9 +145,55 @@ export default function HomeScreen() {
     .sort((a, b) => new Date(b.date) - new Date(a.date))
     .slice(0, 3);
 
- 
+  React.useEffect(() => {
+    let mounted = true;
+    const raw = currentUser?.verificationImage ?? currentUser?.govId;
+    const resolve = async () => {
+      if (!raw) {
+        if (mounted) setAvatarUri(null);
+        return;
+      }
+      if (/^https?:\/\//i.test(raw)) {
+        if (mounted) setAvatarUri(raw);
+        return;
+      }
+      try {
+        const url = await getDownloadURL(storageRef(getStorage(), raw));
+        if (mounted) setAvatarUri(url);
+      } catch (e) {
+        console.warn('Avatar resolve failed:', e?.message || e);
+        if (mounted) setAvatarUri(null);
+      }
+    };
+    resolve();
+    return () => { mounted = false; };
+  }, [currentUser?.verificationImage, currentUser?.govId, currentUser?.updatedAt]);
 
-  const isVerified = user?.adminVerified !== false;
+  // Poll for verification status (every 5s) and on mount
+  React.useEffect(() => {
+    if (!storedUser?.id || !refetchUser) return;
+    refetchUser(); // initial refresh
+    const id = setInterval(() => refetchUser(), 5000);
+    return () => clearInterval(id);
+  }, [storedUser?.id, refetchUser]);
+
+  // When adminVerified flips to true, alert and redirect to /verified
+  React.useEffect(() => {
+    if (!dbUser) return;
+    if (dbUser.adminVerified && !verifiedHandledRef.current) {
+      verifiedHandledRef.current = true;
+      Alert.alert(
+        'Verified',
+        'Your account is now verified! ✅',
+        [
+          { text: 'OK', onPress: () => router.replace('/verified') }
+        ],
+        { cancelable: false }
+      );
+    }
+  }, [dbUser?.adminVerified]);
+
+  const isVerified = Boolean(dbUser?.adminVerified);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -160,10 +212,17 @@ export default function HomeScreen() {
         {/* Profile */}
         <View style={styles.profileRow}>
           <View style={styles.profileInfo}>
-            <Ionicons name="person-circle-outline" size={70} color="#334155" />
+            {/* Avatar image (gov/verification) with fallback icon */}
+            {avatarUri ? (
+              <View style={styles.avatarWrap}>
+                <Image source={{ uri: avatarUri }} style={styles.avatarImage} resizeMode="cover" />
+              </View>
+            ) : (
+              <Ionicons name="person-circle-outline" size={70} color="#334155" />
+            )}
             <View style={{ marginLeft: 12 }}>
               <Text style={styles.welcomeText}>Welcome back,</Text>
-              <Text style={styles.name}>{user?.displayName || 'User'}</Text>
+              <Text style={styles.name}>{currentUser?.displayName || 'User'}</Text>
             </View>
           </View>
           <Image source={require('../../assets/images/176.png')} style={styles.promoImage} />
@@ -629,5 +688,20 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '600',
+  },
+  avatarWrap: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    overflow: 'hidden',
+    backgroundColor: '#E5E7EB',
+    borderWidth: 2,
+    borderColor: '#FFEDD5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
 });

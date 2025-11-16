@@ -11,9 +11,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Image } from 'react-native';
 import { ScrollView } from 'react-native';
+import { useStoredUser } from '../../hooks/useStoredUser';
+import { useUser } from '../../hooks/useUsers';
+import { getStorage, ref as storageRef, getDownloadURL } from 'firebase/storage';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const storedUser = useStoredUser();
+  const { data: dbUser } = useUser(storedUser?.id);
+  const currentUser = dbUser ?? storedUser;
+  const [avatarUri, setAvatarUri] = useState(null);
   const [showBanner, setShowBanner] = useState(true);
   const [showFloatingIcon, setShowFloatingIcon] = useState(false);
   const actions = [
@@ -27,84 +34,104 @@ export default function HomeScreen() {
     { label: 'Feedback', icon: 'megaphone-outline', route: '/verified/feedback' },
   ];
 
+  useEffect(() => {
+    let mounted = true;
+    const raw = currentUser?.verificationImage ?? currentUser?.govId;
+    const resolve = async () => {
+      if (!raw) { if (mounted) setAvatarUri(null); return; }
+      if (/^https?:\/\//i.test(raw)) { if (mounted) setAvatarUri(raw); return; }
+      try {
+        const url = await getDownloadURL(storageRef(getStorage(), raw));
+        if (mounted) setAvatarUri(url);
+      } catch (e) {
+        console.warn('Verified avatar resolve failed:', e?.message || e);
+        if (mounted) setAvatarUri(null);
+      }
+    };
+    resolve();
+    return () => { mounted = false; };
+  }, [currentUser?.verificationImage, currentUser?.govId, currentUser?.updatedAt]);
+
   return (
     <SafeAreaView style={styles.container}>
-       <ScrollView contentContainerStyle={styles.scrollContent}
-         showsVerticalScrollIndicator={false}>
-      {/* Logo */}
-      <View style={styles.logoContainer}>
-      <Image source={require('../../assets/images/Logo.png')} style={styles.promoImage} />
-</View>
-
-      {/* Profile */}
-      <View style={styles.profileRow}>
-        <View style={styles.profileInfo}>
-          <Ionicons name="person-circle-outline" size={70} color="#3E4A5A" />
-          <View style={{ marginLeft: 8 }}>
-            <Text style={styles.name}>Hi, Name</Text>
-            <Text style={styles.verifyText}>+639222555100</Text>
-          </View>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Logo */}
+        <View style={styles.logoContainer}>
+          <Image source={require('../../assets/images/Logo.png')} style={styles.promoImage} />
         </View>
-        <Image source={require('../../assets/images/176.png')} style={styles.promoImage1} />
-      </View>
 
+        {/* Profile */}
+        <View style={styles.profileRow}>
+          <View style={styles.profileInfo}>
+            {avatarUri ? (
+              <View style={styles.avatarWrap}>
+                <Image source={{ uri: avatarUri }} style={styles.avatarImage} resizeMode="cover" />
+              </View>
+            ) : (
+              <Ionicons name="person-circle-outline" size={70} color="#3E4A5A" />
+            )}
+            <View style={{ marginLeft: 8 }}>
+              <Text style={styles.name}>Hi, {currentUser?.displayName || 'Name'}</Text>
+              <Text style={styles.verifyText}>{currentUser?.phone || '+639XXXXXXXXX'}</Text>
+            </View>
+          </View>
+          <Image source={require('../../assets/images/176.png')} style={styles.promoImage1} />
+        </View>
 
-
-      {/* Announcement */}
-      <View style={styles.announcement}>
-        <Text style={styles.announcementTitle}>🚀 New Feature</Text>
-        <Text style={styles.announcementText}>
-          You can now upload images when filing a complaint!
-        </Text>
-      </View>
+        {/* Announcement */}
+        <View style={styles.announcement}>
+          <Text style={styles.announcementTitle}>🚀 New Feature</Text>
+          <Text style={styles.announcementText}>
+            You can now upload images when filing a complaint!
+          </Text>
+        </View>
 
         {/* Grid of Circular Icons */}
         <View style={styles.iconGrid}>
-  {actions.map((item, i) => (
-    <TouchableOpacity
-      key={i}
-      style={styles.iconAction}
-      onPress={() => router.push(item.route)}
-    >
-      <View style={styles.iconCircle}>
-        <Ionicons name={item.icon} size={24} color="#FE712D" />
-      </View>
-      <Text style={styles.iconLabel}>{item.label}</Text>
-    </TouchableOpacity>
-  ))}
-</View>
+          {actions.map((item, i) => (
+            <TouchableOpacity
+              key={i}
+              style={styles.iconAction}
+              onPress={() => router.push(item.route)}
+            >
+              <View style={styles.iconCircle}>
+                <Ionicons name={item.icon} size={24} color="#FE712D" />
+              </View>
+              <Text style={styles.iconLabel}>{item.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
-<View style={styles.summaryCard}>
-  <View style={styles.summaryHeader}>
-    <Text style={styles.summaryTitle}>Streetlight Not Working</Text>
-    <Text style={styles.summaryDate}>Submitted: March 28, 2025</Text>
-  </View>
-  <Text style={styles.statusPending}>🔄 Pending</Text>
-  <TouchableOpacity style={styles.viewAllBtn}>
-    <Text style={styles.viewAllText}>📄 View All</Text>
-  </TouchableOpacity>
-</View>
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryHeader}>
+            <Text style={styles.summaryTitle}>Streetlight Not Working</Text>
+            <Text style={styles.summaryDate}>Submitted: March 28, 2025</Text>
+          </View>
+          <Text style={styles.statusPending}>🔄 Pending</Text>
+          <TouchableOpacity style={styles.viewAllBtn}>
+            <Text style={styles.viewAllText}>📄 View All</Text>
+          </TouchableOpacity>
+        </View>
 
-<View style={styles.cardRow}>
-  <View style={styles.smallStatCard}>
-    <Text style={styles.statLabel}>Open Requests</Text>
-    <Text style={styles.statValue}>🔄 3 Pending</Text>
-  </View>
-  <View style={styles.smallStatCard}>
-    <Text style={styles.statLabel}>Resolved Requests</Text>
-    <Text style={styles.statValue}>✅ 12 Completed</Text>
-  </View>
-</View>
+        <View style={styles.cardRow}>
+          <View style={styles.smallStatCard}>
+            <Text style={styles.statLabel}>Open Requests</Text>
+            <Text style={styles.statValue}>🔄 3 Pending</Text>
+          </View>
+          <View style={styles.smallStatCard}>
+            <Text style={styles.statLabel}>Resolved Requests</Text>
+            <Text style={styles.statValue}>✅ 12 Completed</Text>
+          </View>
+        </View>
 
-      {/* Activity */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Recent Activity</Text>
-        <Text style={styles.sectionSubtitle}>No recent activity yet</Text>
-      </View>
+        {/* Activity */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Recent Activity</Text>
+          <Text style={styles.sectionSubtitle}>No recent activity yet</Text>
+        </View>
 
-      <View style={{ flex: 1 }} />
+        <View style={{ flex: 1 }} />
       </ScrollView>
-
     </SafeAreaView>
   );
 }
@@ -120,7 +147,6 @@ const styles = StyleSheet.create({
     width: '14%',
     marginBottom: 20,
   },
-    
   iconLabel: {
     fontSize: 10,
     textAlign: 'center',
@@ -129,7 +155,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 150,
   },
-  
   profileRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -144,30 +169,24 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 14,
   },
-
   promoImage: {
-    width: 140,      
-    height: 50,      
-    borderRadius: 60, 
+    width: 140,
+    height: 50,
+    borderRadius: 60,
     resizeMode: 'contain',
   },
-  
   promoImage1: {
-    width: 100,      
-    height: 80,      
-    borderRadius: 60,  
+    width: 100,
+    height: 80,
+    borderRadius: 60,
     resizeMode: 'contain',
   },
-
-  
   dismiss: {
     position: 'absolute',
     top: 6,
     right: 6,
     padding: 4,
   },
-
-  
   announcement: {
     backgroundColor: '#D0E6FF',
     padding: 12,
@@ -183,7 +202,6 @@ const styles = StyleSheet.create({
     color: '#1E3A8A',
     fontSize: 12,
   },
-  
   section: {
     marginBottom: 24,
     marginTop: 20,
@@ -223,7 +241,6 @@ const styles = StyleSheet.create({
     height: 40,
     marginBottom: 24,
   },
-  
   logoImage: {
     width: '100%',
     height: '100%',
@@ -232,11 +249,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    gap: 30,               
+    gap: 30,
     marginBottom: 20,
   },
-  
-
   iconCircle: {
     width: 56,
     height: 56,
@@ -246,48 +261,40 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 6,
   },
-  
   wideBanner: {
     height: 100,
     backgroundColor: '#D9D9D9',
     borderRadius: 8,
     marginBottom: 20,
   },
-  
   cardRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  
   smallCard: {
     flex: 0.48,
     height: 100,
     backgroundColor: '#D9D9D9',
     borderRadius: 8,
   },
-  
   summaryCard: {
     backgroundColor: '#E9EDF2',
     borderRadius: 10,
     padding: 16,
     marginBottom: 20,
   },
-  
   summaryHeader: {
     marginBottom: 8,
   },
-  
   summaryTitle: {
     fontWeight: 'bold',
     fontSize: 16,
     color: '#3E4A5A',
   },
-  
   summaryDate: {
     fontSize: 12,
     color: '#777',
   },
-  
   statusPending: {
     backgroundColor: '#FFE5B4',
     alignSelf: 'flex-start',
@@ -299,22 +306,18 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 10,
   },
-  
   viewAllBtn: {
     alignSelf: 'flex-end',
   },
-  
   viewAllText: {
     fontSize: 12,
     color: '#FE712D',
   },
-  
   cardRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 24,
   },
-  
   smallStatCard: {
     flex: 0.48,
     backgroundColor: '#F6F6F6',
@@ -322,17 +325,34 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
   },
-  
   statLabel: {
     fontSize: 14,
     color: '#3E4A5A',
     fontWeight: '600',
     marginBottom: 6,
   },
-  
   statValue: {
     fontSize: 12,
     color: '#5B6B7F',
   },
-  
+  avatarWrap: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    overflow: 'hidden',
+    backgroundColor: '#FFECE2',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFDAC4',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  verifyText: {
+    fontSize: 12,
+    color: '#3E4A5A',
+    marginTop: 2,
+  },
 });

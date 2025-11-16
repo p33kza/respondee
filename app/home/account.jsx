@@ -9,14 +9,18 @@ import {
   Alert,
   Modal,
   ActivityIndicator,
-  Switch
+  Switch,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useStoredUser } from '../../hooks/useStoredUser';
-import {  usePartialUpdateUser, useUser } from '../../hooks/useUsers';
+import { usePartialUpdateUser, useUser } from '../../hooks/useUsers';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import { API_BASE_URL } from '../../apis/api';
+import { useFocusEffect } from '@react-navigation/native';
 
 export default function ProfileScreen() {
   const [showMenu, setShowMenu] = useState(false);
@@ -27,9 +31,15 @@ export default function ProfileScreen() {
     phone: '',
     email: ''
   });
+  const [isUploadingGov, setIsUploadingGov] = useState(false);
 
   const userResult = useStoredUser();
-  const { data: user } = useUser(userResult?.id);
+  const { data: user, refetch } = useUser(userResult?.id);
+
+  const isVerified = Boolean(
+    (user?.isEmailVerified && user?.isPhoneVerified) || user?.adminVerified
+  );
+
   const { mutateAsync: updateUserMutation, isPending: isUpdating } = usePartialUpdateUser();
 
   React.useEffect(() => {
@@ -41,6 +51,85 @@ export default function ProfileScreen() {
       });
     }
   }, [user]);
+
+  React.useEffect(() => {
+    if (!userResult?.id || !refetch) return;
+    const id = setInterval(() => refetch(), 5000);
+    return () => clearInterval(id);
+  }, [userResult?.id, refetch]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      refetch?.();
+      return () => {};
+    }, [refetch])
+  );
+
+  const uploadVerificationImage = async (uid, base64) => {
+    const url = `${API_BASE_URL}/api/users/${uid}/verification-image`;
+    const body = {
+      imageBase64: String(base64).replace(/^data:image\/\w+;base64,/, ''),
+      contentType: 'image/jpeg',
+    };
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const text = await res.text();
+    let data;
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      data = { error: text };
+    }
+    if (!res.ok) throw new Error(data?.error || data?.message || `HTTP ${res.status}`);
+    return data?.url;
+  };
+
+  const handleChangeGovId = async () => {
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (perm.status !== 'granted') {
+        Alert.alert('Permission required', 'Please allow photo library access to change your ID.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+        base64: true,
+      });
+      if (result.canceled) return;
+
+      setIsUploadingGov(true);
+      const asset = result.assets?.[0];
+      const base64 = asset?.base64;
+      if (!base64) throw new Error('Could not read selected image.');
+
+      const url = await uploadVerificationImage(user.id, base64);
+
+      await updateUserMutation({
+        id: user.id,
+        updates: { verificationImage: url, rejectReason: null },
+      });
+
+      await AsyncStorage.setItem(
+        'user',
+        JSON.stringify({ ...user, verificationImage: url, rejectReason: null })
+      );
+
+      await refetch?.();
+
+      Alert.alert('Success', 'Your government ID has been updated.');
+    } catch (e) {
+      Alert.alert('Error', e?.message || 'Failed to update ID. Please try again.');
+    } finally {
+      setIsUploadingGov(false);
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert(
@@ -240,12 +329,48 @@ export default function ProfileScreen() {
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.avatarSection}>
-          <View style={styles.avatarContainer}>
-            <MaterialIcons name="person" size={48} color="#FFFFFF" />
+          {/* Wrapper so the badge can sit outside the clipped circle */}
+          <View style={styles.avatarWrapper}>
+            <TouchableOpacity
+              style={styles.avatarContainer}
+              activeOpacity={0.85}
+              onPress={handleChangeGovId}
+            >
+              {user?.verificationImage ? (
+                <Image
+                  source={{ uri: user.verificationImage }}
+                  style={styles.avatarImage}
+                  resizeMode="cover"
+                />
+              ) : (
+                <MaterialIcons name="person" size={48} color="#FFFFFF" />
+              )}
+
+              {isUploadingGov && (
+                <View style={styles.avatarOverlay}>
+                  <ActivityIndicator color="#FFFFFF" />
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {/* Badge now outside the circle */}
+            <View style={styles.avatarEditBadge}>
+              <MaterialIcons name="edit" size={16} color="#FFFFFF" />
+            </View>
           </View>
-          <Text style={styles.displayName}>
-            {user.displayName || 'User'}
-          </Text>
+
+          <View style={styles.displayNameRow}>
+            <Text style={[styles.displayName, { marginBottom: 0 }]}>
+              {user.displayName || 'User'}
+            </Text>
+            <MaterialIcons
+              name={isVerified ? 'verified' : 'cancel'}
+              size={20}
+              color={isVerified ? '#34C759' : '#FF3B30'}
+              style={styles.verifiedIcon}
+            />
+          </View>
+
           <Text style={styles.userId}>ID: {user.id?.toString().slice(-8) || 'N/A'}</Text>
         </View>
 
@@ -271,16 +396,11 @@ export default function ProfileScreen() {
             <View style={styles.infoLabelContainer}>
               <Text style={styles.infoLabel}>Email</Text>
               <View style={styles.verificationContainer}>
-                <MaterialIcons 
-                  name={user.isEmailVerified ? "verified" : "warning"} 
-                  size={16} 
-                  color={user.isEmailVerified ? "#34C759" : "#FF9500"} 
-                />
                 <Text style={[
                   styles.verificationText,
                   { color: user.isEmailVerified ? "#34C759" : "#FF9500" }
                 ]}>
-                  {user.isEmailVerified ? "Verified" : "Not Verified"}
+                  
                 </Text>
               </View>
             </View>
@@ -303,16 +423,12 @@ export default function ProfileScreen() {
             <View style={styles.infoLabelContainer}>
               <Text style={styles.infoLabel}>Phone</Text>
               <View style={styles.verificationContainer}>
-                <MaterialIcons 
-                  name={user.isPhoneVerified ? "verified" : "warning"} 
-                  size={16} 
-                  color={user.isPhoneVerified ? "#34C759" : "#FF9500"} 
-                />
+
                 <Text style={[
                   styles.verificationText,
                   { color: user.isPhoneVerified ? "#34C759" : "#FF9500" }
                 ]}>
-                  {user.isPhoneVerified ? "Verified" : "Not Verified"}
+                  
                 </Text>
               </View>
             </View>
@@ -329,6 +445,18 @@ export default function ProfileScreen() {
               <Text style={styles.infoValue}>{user.phone || 'Not set'}</Text>
             )}
           </View>
+
+          {/* Verification rejection notice */}
+          {Boolean(user?.rejectReason) && (
+            <View style={styles.rejectionBox}>
+              <Text style={styles.rejectionTitle}>
+                Your verification request has been rejected!
+              </Text>
+              <Text style={styles.rejectionReason}>
+                {user.rejectReason}
+              </Text>
+            </View>
+          )}
         </View>
     
 
@@ -401,6 +529,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     paddingVertical: 32,
   },
+  avatarWrapper: {
+    position: 'relative',
+    width: 100,
+    height: 100,
+    marginBottom: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   avatarContainer: {
     width: 100,
     height: 100,
@@ -408,13 +544,50 @@ const styles = StyleSheet.create({
     backgroundColor: '#ff9500',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 50,
+  },
+  avatarOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarEditBadge: {
+    position: 'absolute',
+    right: -6,
+    bottom: -6,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#ff9500',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
+    elevation: 3,
   },
   displayName: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#000000',
     marginBottom: 4,
+  },
+  displayNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  verifiedIcon: {
+    marginLeft: 8,
   },
   userId: {
     fontSize: 14,
@@ -645,5 +818,25 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 40,
     fontStyle: 'italic',
+  },
+  rejectionBox: {
+    marginHorizontal: 20,
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#FFE5E5',
+    borderWidth: 1,
+    borderColor: '#FF3B30',
+  },
+  rejectionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FF3B30',
+    marginBottom: 6,
+  },
+  rejectionReason: {
+    fontSize: 13,
+    color: '#000',
+    lineHeight: 18,
   },
 });

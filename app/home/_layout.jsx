@@ -2,6 +2,9 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { View, StyleSheet, Alert } from 'react-native';
+import React, { useCallback } from 'react';
+import { useUser } from '../../hooks/useUsers';
+import { useFocusEffect } from '@react-navigation/native';
 
 import HomeScreen from './index';
 import NotificationScreen from './notification';
@@ -23,7 +26,16 @@ const Stack = createNativeStackNavigator();
 
 function MainTabs() {
   const user = useStoredUser();
-  const isAdminVerified = user?.adminVerified === true;
+  const { data: dbUser, refetch } = useUser(user?.id);
+  const isAdminVerified = Boolean(dbUser?.adminVerified ?? user?.adminVerified);
+
+  useFocusEffect(
+    useCallback(() => {
+      refetch?.();
+      const id = setInterval(() => refetch?.(), 5000);
+      return () => clearInterval(id);
+    }, [refetch])
+  );
 
   return (
     <Tab.Navigator

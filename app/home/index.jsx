@@ -9,6 +9,9 @@ import {
   FlatList,
   RefreshControl,
   Alert,
+  BackHandler,      // <-- added
+  Platform,         // <-- added
+  ToastAndroid,     // <-- added
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -16,9 +19,10 @@ import { Image } from 'react-native';
 import { ScrollView } from 'react-native';
 import { useStoredUser } from '../../hooks/useStoredUser';
 import { useRequests } from '../../hooks/useRequests';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native'; // <-- updated
 import { useUser } from '../../hooks/useUsers';
 import { getStorage, ref as storageRef, getDownloadURL } from 'firebase/storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function HomeScreen() {
   const navigation = useNavigation();
@@ -29,6 +33,11 @@ export default function HomeScreen() {
   const currentUser = dbUser ?? storedUser;
   const [avatarUri, setAvatarUri] = React.useState(null);
   const verifiedHandledRef = useRef(false); // prevent duplicate alerts
+  const backPressTsRef = useRef(0); // <-- added
+
+  const userId = storedUser?.id;
+  const ackKey = React.useMemo(() => (userId ? `verifiedAck:${userId}` : null), [userId]);
+  const [verifiedAck, setVerifiedAck] = React.useState(false);
 
   const { data: userRequests = [], isLoading, refetch, isRefreshing } = useGetRequestsByUser(storedUser?.id);
 
@@ -169,31 +178,71 @@ export default function HomeScreen() {
     return () => { mounted = false; };
   }, [currentUser?.verificationImage, currentUser?.govId, currentUser?.updatedAt]);
 
+  // Load persisted ack once per user
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      if (!ackKey) return;
+      try {
+        const v = await AsyncStorage.getItem(ackKey);
+        if (mounted) setVerifiedAck(v === 'true');
+      } catch {}
+    })();
+    return () => { mounted = false; };
+  }, [ackKey]);
+
   // Poll for verification status (every 5s) and on mount
   React.useEffect(() => {
-    if (!storedUser?.id || !refetchUser) return;
-    refetchUser(); // initial refresh
+    if (!userId || !refetchUser) return;
+    refetchUser();
     const id = setInterval(() => refetchUser(), 5000);
     return () => clearInterval(id);
-  }, [storedUser?.id, refetchUser]);
+  }, [userId, refetchUser]);
 
-  // When adminVerified flips to true, alert and redirect to /verified
+  // When adminVerified flips to true, show once and persist ack + cached user
   React.useEffect(() => {
-    if (!dbUser) return;
-    if (dbUser.adminVerified && !verifiedHandledRef.current) {
-      verifiedHandledRef.current = true;
-      Alert.alert(
-        'Verified',
-        'Your account is now verified! ✅',
-        [
-          { text: 'OK', onPress: () => router.replace('/verified') }
-        ],
-        { cancelable: false }
-      );
-    }
-  }, [dbUser?.adminVerified]);
+    if (!dbUser || !dbUser.adminVerified || verifiedAck) return;
+    Alert.alert(
+      'Verified',
+      'Your account is now verified! ✅',
+      [{
+        text: 'OK',
+        onPress: async () => {
+          try {
+            if (ackKey) await AsyncStorage.setItem(ackKey, 'true');           // persist ack
+            await AsyncStorage.setItem('user', JSON.stringify({               // persist cached user
+              ...(storedUser || {}),
+              adminVerified: true,
+            }));
+            setVerifiedAck(true);
+          } catch {}
+        }
+      }],
+      { cancelable: false }
+    );
+  }, [dbUser?.adminVerified, verifiedAck, ackKey, storedUser]);
 
-  const isVerified = Boolean(dbUser?.adminVerified);
+  // Use live (or cached) verification to gate UI
+  const isVerified = Boolean(dbUser?.adminVerified ?? storedUser?.adminVerified);
+
+  // Handle Android hardware back on Home: double-press to exit
+  useFocusEffect(
+    React.useCallback(() => {
+      if (Platform.OS !== 'android') return () => {};
+      const onBackPress = () => {
+        const now = Date.now();
+        if (now - backPressTsRef.current < 2000) {
+          BackHandler.exitApp();
+          return true;
+        }
+        backPressTsRef.current = now;
+        ToastAndroid.show('Press back again to exit', ToastAndroid.SHORT);
+        return true; // consume event
+      };
+      const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => sub.remove();
+    }, [])
+  );
 
   return (
     <SafeAreaView style={styles.container}>
